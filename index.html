@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#12141a">
+<meta http-equiv="Cache-Control" content="no-cache, must-revalidate">
+<meta name="build" content="3">
 <title>Roost</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🪺</text></svg>">
 <style>
@@ -101,9 +103,6 @@ const app = initializeApp({
 });
 const auth = getAuth(app);
 const db = getFirestore(app);
-// Keep the device signed in. Never let this block or kill the module — if it
-// throws, we must still reach onAuthStateChanged below or the page stays blank.
-try { await setPersistence(auth, browserLocalPersistence); } catch (e) {}
 
 const $ = id => document.getElementById(id);
 const money = n => (n < 0 ? "-" : "") + "$" + Math.abs(Math.round(n)).toLocaleString();
@@ -132,11 +131,20 @@ function show(which) {
   $("app").style.display   = which === "app"   ? "block" : "none";
 }
 
-onAuthStateChanged(auth, user => {
-  window.__roostReady = true;      // tells the fail-safe timer we got this far
-  if (user) { show("app"); load(); }
-  else { show("login"); }
-});
+// No top-level await anywhere — older phone browsers / WebViews fail to parse
+// the whole module if it's present, which would break sign-in entirely.
+(function start() {
+  const go = () => onAuthStateChanged(auth, user => {
+    window.__roostReady = true;    // tells the fail-safe timer we got this far
+    if (user) { show("app"); load(); }
+    else { show("login"); }
+  });
+  // Persist the session so it's a one-time sign-in; never let it block sign-in.
+  try {
+    const p = setPersistence(auth, browserLocalPersistence);
+    (p && p.then) ? p.then(go, go) : go();
+  } catch (e) { go(); }
+})();
 
 // ---- render ----
 async function load() {
