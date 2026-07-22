@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#12141a">
+<title>Roost</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🪺</text></svg>">
+<style>
+  :root{
+    --bg:#12141a; --surface:#1b1e27; --surface2:#232733; --border:#2c3140;
+    --text:#e7e9ee; --muted:#8b90a0; --accent:#4a9d6a; --accent-hi:#5cb87e;
+    --danger:#d16a6a; --gold:#c9a55a; --gold-hi:#dcbb6e; --blue:#648cff;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);}
+  .wrap{max-width:560px;margin:0 auto;padding:18px 16px 48px}
+  .cap{color:var(--muted);font-size:10px;font-weight:700;letter-spacing:2px;margin:22px 0 8px}
+  .cap:first-child{margin-top:0}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;
+    padding:14px 16px;margin-bottom:10px}
+  .row{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .muted{color:var(--muted);font-size:12px}
+  .tiny{color:var(--muted);font-size:11px}
+  .big{font-size:38px;font-weight:300;letter-spacing:-1px;line-height:1.1}
+  .mono{font-variant-numeric:tabular-nums;font-feature-settings:"tnum"}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .val{font-size:20px;font-weight:700}
+  .pos{color:var(--accent-hi)} .neg{color:var(--danger)}
+  .gold{color:var(--gold-hi)} .blue{color:var(--blue)}
+  .bar{height:8px;background:var(--border);border-radius:4px;overflow:hidden;margin-top:8px}
+  .bar>i{display:block;height:100%;border-radius:4px;background:var(--gold)}
+  .grade{font-size:46px;font-weight:800;line-height:1}
+  .pill{display:inline-block;padding:2px 8px;border-radius:99px;font-size:11px;
+    border:1px solid var(--border);color:var(--muted)}
+  .note{border-left:3px solid var(--gold);padding-left:12px}
+  .note.bad{border-color:var(--danger)} .note.good{border-color:var(--accent)}
+  button{font:inherit}
+  .btn{width:100%;padding:13px;border-radius:10px;border:none;background:var(--accent);
+    color:#fff;font-weight:700;font-size:15px}
+  input{width:100%;padding:12px;border-radius:8px;border:1px solid var(--border);
+    background:var(--surface2);color:var(--text);font-size:16px;margin-bottom:10px}
+  #login{display:none;padding-top:14vh}
+  .brand{font-size:26px;font-weight:700;margin-bottom:2px}
+  .err{color:var(--danger);font-size:13px;min-height:18px}
+  .foot{color:var(--muted);font-size:11px;text-align:center;margin-top:26px}
+  a{color:var(--muted)}
+</style>
+</head>
+<body>
+
+<div class="wrap" id="login">
+  <div class="brand">Roost</div>
+  <div class="muted" style="margin-bottom:18px">Sign in once — this device stays signed in.</div>
+  <input id="email" type="email" autocomplete="username" placeholder="Email" inputmode="email">
+  <input id="pw" type="password" autocomplete="current-password" placeholder="Password">
+  <div class="err" id="err"></div>
+  <button class="btn" id="go">Sign in</button>
+</div>
+
+<div class="wrap" id="app" style="display:none">
+  <div id="content"></div>
+  <div class="foot">
+    Read-only viewer · <span id="stamp"></span><br>
+    <a href="#" id="out">Sign out</a>
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut,
+         setPersistence, browserLocalPersistence }
+  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getFirestore, collection, getDocs, doc, getDoc }
+  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const app = initializeApp({
+  apiKey: "AIzaSyCYUzGLKGVUe13t5L1NBfBLHryKuc2_FYk",
+  authDomain: "roost-d123c.firebaseapp.com",
+  projectId: "roost-d123c",
+});
+const auth = getAuth(app);
+const db = getFirestore(app);
+await setPersistence(auth, browserLocalPersistence);
+
+const $ = id => document.getElementById(id);
+const money = n => (n < 0 ? "-" : "") + "$" + Math.abs(Math.round(n)).toLocaleString();
+const money2 = n => (n < 0 ? "-" : "") + "$" + Math.abs(n).toLocaleString(undefined,
+  {minimumFractionDigits:2, maximumFractionDigits:2});
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c =>
+  ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+// ---- auth ----
+$("go").onclick = async () => {
+  $("err").textContent = "";
+  try {
+    await signInWithEmailAndPassword(auth, $("email").value.trim(), $("pw").value);
+  } catch (e) {
+    $("err").textContent = /invalid|password|credential/i.test(e.code || "")
+      ? "Wrong email or password." : "Couldn't sign in. Check your connection.";
+  }
+};
+$("pw").addEventListener("keydown", e => { if (e.key === "Enter") $("go").click(); });
+$("out").onclick = async e => { e.preventDefault(); await signOut(auth); location.reload(); };
+
+onAuthStateChanged(auth, user => {
+  if (user) { $("login").style.display = "none"; $("app").style.display = ""; load(); }
+  else { $("login").style.display = ""; $("app").style.display = "none"; }
+});
+
+// ---- render ----
+async function load() {
+  try {
+    const [snapDoc, acctSnap] = await Promise.all([
+      getDoc(doc(db, "meta", "phone_snapshot")),
+      getDocs(collection(db, "accounts")),
+    ]);
+    const s = snapDoc.exists() ? snapDoc.data() : null;
+    const accounts = acctSnap.docs.map(d => d.data());
+    $("content").innerHTML = view(s, accounts);
+    $("stamp").textContent = s?.generated
+      ? "updated " + new Date(s.generated).toLocaleString(undefined,
+          {month:"short", day:"numeric", hour:"numeric", minute:"2-digit"})
+      : "no snapshot yet";
+  } catch (e) {
+    $("content").innerHTML =
+      `<div class="card"><b>Couldn't load your data.</b><div class="muted"
+       style="margin-top:6px">${esc(e.message || e)}</div></div>`;
+  }
+}
+
+function view(s, accounts) {
+  const isDebt = a => a.type === "Credit Card" || a.type === "Loan";
+  const assets = accounts.filter(a => !isDebt(a));
+  const debts  = accounts.filter(a =>  isDebt(a));
+  const sum = xs => xs.reduce((t, a) => t + (+a.balance || 0), 0);
+  const netWorth = s ? s.net_worth : sum(assets) - sum(debts);
+  let h = "";
+
+  // net worth
+  h += `<div class="cap">NET WORTH</div>
+    <div class="big ${netWorth < 0 ? "neg" : ""} mono">${money(netWorth)}</div>
+    <div class="muted" style="margin-top:4px">assets ${money(sum(assets))} · debts ${money(sum(debts))}</div>`;
+
+  // last month
+  if (s) {
+    const net = s.net ?? 0;
+    h += `<div class="cap">${esc(monthName(s.month_label))} — LAST FULL MONTH</div>
+      <div class="grid2">
+        <div class="card"><div class="tiny">FREE</div>
+          <div class="val ${net >= 0 ? "pos" : "neg"} mono">${net >= 0 ? "+" : "-"}${money(Math.abs(net))}</div>
+          <div class="tiny">after ${money(s.saved || 0)} saved</div></div>
+        <div class="card"><div class="tiny">SPENT</div>
+          <div class="val neg mono">${money(s.spending || 0)}</div>
+          <div class="tiny">in ${money(s.income || 0)}</div></div>
+      </div>`;
+    if (s.grade) {
+      const gc = "ABC".includes(s.grade) ? (s.grade === "C" ? "gold" : "pos") : "neg";
+      const arrow = s.grade_delta > 0 ? "▲" : s.grade_delta < 0 ? "▼" : "▬";
+      h += `<div class="card"><div class="row">
+          <div><div class="tiny">HEALTH</div><div class="grade ${gc}">${esc(s.grade)}</div></div>
+          <div style="flex:1;text-align:right">
+            ${(s.grade_factors || []).map(f =>
+              `<div class="tiny" style="color:${f.ok ? "var(--accent-hi)" : "var(--muted)"}">
+                 ${f.ok ? "✓" : "•"} ${esc(f.name)} — ${esc(f.detail)}</div>`).join("")}
+            <div class="tiny" style="margin-top:4px">${arrow} ${Math.abs(s.grade_delta || 0)} vs prior</div>
+          </div></div></div>`;
+    }
+  }
+
+  // the plan
+  if (s?.plan?.cuts?.length) {
+    const p = s.plan;
+    h += `<div class="cap">THE PLAN — WHERE TO CUT</div>
+      <div class="card" style="border-color:var(--gold)">
+        <div class="val gold mono">Free up ~${money(p.total_save)}/mo</div>`;
+    if (p.months_sooner_label) {
+      h += `<div class="tiny" style="margin-top:4px">debt-free ${esc(p.months_sooner_label)} sooner ·
+            ${money(p.interest_saved)} less interest</div>`;
+    }
+    h += `</div>`;
+    for (const c of p.cuts) {
+      h += `<div class="card"><div class="row">
+          <b style="font-size:14px">${esc(c.category)}</b>
+          <span class="pos mono" style="font-weight:700">save ${money(c.save)}</span></div>
+        <div class="tiny mono">${money(c.baseline)} → ${money(c.target)}</div>
+        <div class="tiny">${esc(c.why)}</div></div>`;
+    }
+    if (p.subs_save > 0) {
+      h += `<div class="card"><div class="row"><b style="font-size:14px">Subscriptions</b>
+          <span class="pos mono" style="font-weight:700">save ~${money(p.subs_save)}</span></div>
+        <div class="tiny">${money(p.subs_total)}/mo across ${p.subs_count} recurring charges</div></div>`;
+    }
+  }
+
+  // cards & loans
+  if (debts.length) {
+    h += `<div class="cap">CARDS &amp; LOANS</div>`;
+    if (s?.debt_free_label) {
+      const never = s.debt_free_never;
+      h += `<div class="card"><div class="row">
+          <span class="muted">Debt-free</span>
+          <b class="${never ? "neg" : "gold"}">${esc(s.debt_free_label)}</b></div>
+        <div class="tiny">${never ? "minimums don't cover the interest — the planner on desktop fixes this"
+                                  : "paying minimums"}</div></div>`;
+    }
+    for (const a of debts.sort((x, y) => (+y.balance||0) - (+x.balance||0))) {
+      h += `<div class="card"><div class="row">
+          <div><b style="font-size:14px">${esc(a.name)}</b>
+            <div class="tiny">${(+a.apr||0)}% APR${a.min_payment ? " · min " + money2(a.min_payment) : " · no minimum set"}</div></div>
+          <span class="neg mono" style="font-weight:700">${money2(a.balance||0)}</span>
+        </div></div>`;
+    }
+  }
+
+  // cash
+  if (assets.length) {
+    h += `<div class="cap">CASH &amp; SAVINGS</div>`;
+    for (const a of assets.sort((x, y) => (+y.balance||0) - (+x.balance||0))) {
+      h += `<div class="card"><div class="row">
+          <div><b style="font-size:14px">${esc(a.name)}</b>
+            <div class="tiny">${esc(a.type)}${a.apr ? " · " + a.apr + "% APY" : ""}</div></div>
+          <span class="pos mono" style="font-weight:700">${money2(a.balance||0)}</span>
+        </div></div>`;
+    }
+  }
+
+  // milestones
+  if (s?.wins && (s.wins.paid_down > 0 || (s.wins.killed || []).length)) {
+    const w = s.wins;
+    h += `<div class="cap">MILESTONES</div><div class="card">
+      <div class="row"><span class="muted">Paid down</span>
+        <b class="pos mono">${money(w.paid_down)}</b></div>
+      <div class="row" style="margin-top:6px"><span class="muted">Interest dodged</span>
+        <b class="gold mono">${money(w.interest_dodged)}</b></div>`;
+    if (w.next_badge) {
+      h += `<div class="bar"><i style="width:${Math.round((w.badge_frac||0)*100)}%"></i></div>
+        <div class="tiny" style="margin-top:6px">next badge at ${money(w.next_badge)}</div>`;
+    }
+    if (w.next_kill) {
+      h += `<div class="tiny" style="margin-top:8px">🎯 Next to die: <b>${esc(w.next_kill)}</b>
+            ${w.next_kill_label ? "in ~" + esc(w.next_kill_label) : ""}</div>`;
+    }
+    if ((w.killed || []).length) {
+      h += `<div class="tiny" style="margin-top:4px">🏆 Destroyed: ${esc(w.killed.join(", "))}</div>`;
+    }
+    h += `</div>`;
+  }
+
+  // watchdog
+  if (s?.watchdog?.length) {
+    h += `<div class="cap">WATCHDOG</div>`;
+    for (const t of s.watchdog) {
+      h += `<div class="card note bad"><div style="font-size:13px">🐕 ${esc(t)}</div></div>`;
+    }
+  }
+
+  // top spending
+  if (s?.top_spending?.length) {
+    const peak = s.top_spending[0].amount || 1;
+    h += `<div class="cap">TOP SPENDING</div><div class="card">`;
+    for (const t of s.top_spending) {
+      h += `<div style="margin-bottom:10px">
+          <div class="row"><span style="font-size:13px">${esc(t.category)}</span>
+            <b class="mono" style="font-size:13px">${money(t.amount)}</b></div>
+          <div class="bar"><i style="width:${Math.round(t.amount/peak*100)}%"></i></div>
+        </div>`;
+    }
+    h += `</div>`;
+  }
+
+  if (!s) {
+    h += `<div class="card"><b>No snapshot yet.</b><div class="muted" style="margin-top:6px">
+      Open Roost on your PC once — it publishes the numbers this viewer reads.</div></div>`;
+  }
+  return h;
+}
+
+// Exposed for debugging: render any snapshot without hitting the network.
+// Pure function, no data or credentials of its own.
+window.roostRender = (s, accounts) => view(s, accounts || []);
+
+function monthName(ym) {
+  if (!ym) return "LAST MONTH";
+  const [y, m] = ym.split("-").map(Number);
+  return new Date(y, (m || 1) - 1, 1)
+    .toLocaleString(undefined, { month: "long" }).toUpperCase();
+}
+</script>
+</body>
+</html>
