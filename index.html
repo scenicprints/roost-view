@@ -42,7 +42,10 @@
     color:#fff;font-weight:700;font-size:15px}
   input{width:100%;padding:12px;border-radius:8px;border:1px solid var(--border);
     background:var(--surface2);color:var(--text);font-size:16px;margin-bottom:10px}
-  #login{display:none;padding-top:14vh}
+  /* NOTE: never hide #login here. It is the fail-safe default view — if the
+     script dies, the user must still see something. Visibility is toggled with
+     explicit inline display values only. */
+  #login{padding-top:12vh}
   .brand{font-size:26px;font-weight:700;margin-bottom:2px}
   .err{color:var(--danger);font-size:13px;min-height:18px}
   .foot{color:var(--muted);font-size:11px;text-align:center;margin-top:26px}
@@ -61,13 +64,28 @@
 </div>
 
 <div class="wrap" id="app" style="display:none">
-  <div id="content"></div>
+  <div id="content"><div class="card">Loading your numbers…</div></div>
   <div class="foot">
     Read-only viewer · <span id="stamp"></span><br>
     <a href="#" id="out">Sign out</a>
   </div>
 </div>
 
+<script>
+// Fail-safe: if the module below never runs (CDN blocked, old browser, syntax
+// error) the sign-in form is already visible, and this surfaces the reason
+// instead of leaving a blank screen.
+window.addEventListener("error", e => {
+  const err = document.getElementById("err");
+  if (err && !err.textContent) err.textContent = "Load error: " + (e.message || "script failed");
+});
+setTimeout(() => {
+  const err = document.getElementById("err");
+  if (err && !window.__roostReady && !err.textContent) {
+    err.textContent = "Still loading… if this persists, check your connection.";
+  }
+}, 6000);
+</script>
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut,
@@ -83,7 +101,9 @@ const app = initializeApp({
 });
 const auth = getAuth(app);
 const db = getFirestore(app);
-await setPersistence(auth, browserLocalPersistence);
+// Keep the device signed in. Never let this block or kill the module — if it
+// throws, we must still reach onAuthStateChanged below or the page stays blank.
+try { await setPersistence(auth, browserLocalPersistence); } catch (e) {}
 
 const $ = id => document.getElementById(id);
 const money = n => (n < 0 ? "-" : "") + "$" + Math.abs(Math.round(n)).toLocaleString();
@@ -105,9 +125,17 @@ $("go").onclick = async () => {
 $("pw").addEventListener("keydown", e => { if (e.key === "Enter") $("go").click(); });
 $("out").onclick = async e => { e.preventDefault(); await signOut(auth); location.reload(); };
 
+// Toggle with explicit values — "" would fall back to any CSS rule and could
+// leave both panels hidden (that bug shipped once; don't reintroduce it).
+function show(which) {
+  $("login").style.display = which === "login" ? "block" : "none";
+  $("app").style.display   = which === "app"   ? "block" : "none";
+}
+
 onAuthStateChanged(auth, user => {
-  if (user) { $("login").style.display = "none"; $("app").style.display = ""; load(); }
-  else { $("login").style.display = ""; $("app").style.display = "none"; }
+  window.__roostReady = true;      // tells the fail-safe timer we got this far
+  if (user) { show("app"); load(); }
+  else { show("login"); }
 });
 
 // ---- render ----
