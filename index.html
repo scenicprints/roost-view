@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#12141a">
 <meta http-equiv="Cache-Control" content="no-cache, must-revalidate">
-<meta name="build" content="5">
+<meta name="build" content="6">
 <!-- Home-screen install: opens standalone (no browser bars), own icon. -->
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -140,6 +140,16 @@
 </div>
 
 <script>
+// Register the service worker. Without one Android Chrome will not offer a real
+// install, and "Add to Home screen" produces a bookmark that opens in a browser
+// tab with the address bar. Wrapped and deferred so it can never delay or break
+// sign-in — the app works fine if this fails.
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("sw.js").catch(() => {});
+  });
+}
+
 // Fail-safe: if the module below never runs (CDN blocked, old browser, syntax
 // error) the sign-in form is already visible, and this surfaces the reason
 // instead of leaving a blank screen.
