@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#12141a">
 <meta http-equiv="Cache-Control" content="no-cache, must-revalidate">
-<meta name="build" content="4">
+<meta name="build" content="5">
 <!-- Home-screen install: opens standalone (no browser bars), own icon. -->
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -20,11 +20,13 @@
     --bg:#12141a; --surface:#1b1e27; --surface2:#232733; --border:#2c3140;
     --text:#e7e9ee; --muted:#8b90a0; --accent:#4a9d6a; --accent-hi:#5cb87e;
     --danger:#d16a6a; --gold:#c9a55a; --gold-hi:#dcbb6e; --blue:#648cff;
+    --tabbar:78px;                       /* height of the bottom nav */
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   body{margin:0;background:var(--bg);color:var(--text);
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
-    padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);}
+    padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+    overscroll-behavior-y:contain;}
   .wrap{max-width:560px;margin:0 auto;padding:18px 16px 48px}
   .cap{color:var(--muted);font-size:10px;font-weight:700;letter-spacing:2px;margin:22px 0 8px}
   .cap:first-child{margin-top:0}
@@ -59,6 +61,54 @@
   .err{color:var(--danger);font-size:13px;min-height:18px}
   .foot{color:var(--muted);font-size:11px;text-align:center;margin-top:26px}
   a{color:var(--muted)}
+
+  /* ---- app chrome: sticky header + bottom tab bar --------------------- */
+  #app{padding-bottom:calc(var(--tabbar) + env(safe-area-inset-bottom))}
+  .topbar{position:sticky;top:0;z-index:20;background:rgba(18,20,26,.92);
+    backdrop-filter:blur(10px);border-bottom:1px solid var(--border)}
+  .topbar-in{max-width:560px;margin:0 auto;padding:12px 16px;
+    display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .title{font-size:19px;font-weight:700}
+  .refresh{background:var(--surface2);border:1px solid var(--border);color:var(--muted);
+    border-radius:10px;min-width:44px;min-height:36px;padding:0 12px;font-size:12px}
+  .refresh:active{background:var(--border)}
+  .spin{animation:sp .8s linear infinite;display:inline-block}
+  @keyframes sp{to{transform:rotate(360deg)}}
+
+  .tabbar{position:fixed;left:0;right:0;bottom:0;z-index:30;
+    background:rgba(18,20,26,.96);backdrop-filter:blur(12px);
+    border-top:1px solid var(--border);
+    padding-bottom:env(safe-area-inset-bottom)}
+  .tabbar-in{max-width:560px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr)}
+  .tab{background:none;border:none;color:var(--muted);
+    min-height:58px;padding:9px 4px 7px;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:4px;font-size:11px;font-weight:600}
+  .tab svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.9;
+    stroke-linecap:round;stroke-linejoin:round}
+  .tab[aria-selected="true"]{color:var(--accent-hi)}
+  .tab:active{background:var(--surface2)}
+  .dot{position:absolute;transform:translate(15px,-11px);width:7px;height:7px;
+    border-radius:50%;background:var(--gold-hi)}
+
+  /* ---- Ada's Debt ------------------------------------------------------ */
+  .acct{background:var(--surface);border:1px solid var(--border);border-radius:12px;
+    padding:12px 14px;margin-bottom:12px}
+  .acct-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;
+    padding-bottom:8px;border-bottom:1px solid var(--border);margin-bottom:4px}
+  .acct-name{font-size:16px;font-weight:700}
+  details.cardrow{border-radius:9px;margin-top:8px;background:var(--surface2)}
+  details.cardrow>summary{list-style:none;cursor:pointer;padding:11px 12px;
+    display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:46px}
+  details.cardrow>summary::-webkit-details-marker{display:none}
+  .chev{transition:transform .15s;color:var(--muted);flex:none}
+  details[open]>summary .chev{transform:rotate(90deg)}
+  .lines{padding:2px 12px 10px}
+  .line{display:flex;align-items:center;gap:10px;padding:6px 0;
+    border-top:1px solid var(--border);font-size:12px}
+  .line .d{color:var(--muted);font-size:11px;min-width:42px}
+  .line .n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .empty{text-align:center;color:var(--muted);padding:40px 16px;font-size:13px}
+  .empty .em{font-size:34px;display:block;margin-bottom:10px;opacity:.65}
 </style>
 </head>
 <body>
@@ -72,12 +122,21 @@
   <button class="btn" id="go">Sign in</button>
 </div>
 
-<div class="wrap" id="app" style="display:none">
-  <div id="content"><div class="card">Loading your numbers…</div></div>
-  <div class="foot">
-    Read-only viewer · <span id="stamp"></span><br>
-    <a href="#" id="out">Sign out</a>
+<div id="app" style="display:none">
+  <div class="topbar"><div class="topbar-in">
+    <div class="title" id="ttl">Home</div>
+    <button class="refresh" id="rf">Refresh</button>
+  </div></div>
+
+  <div class="wrap">
+    <div id="content"><div class="card">Loading your numbers…</div></div>
+    <div class="foot">
+      Read-only viewer · <span id="stamp"></span><br>
+      <a href="#" id="out">Sign out</a>
+    </div>
   </div>
+
+  <nav class="tabbar"><div class="tabbar-in" id="tabs"></div></nav>
 </div>
 
 <script>
@@ -153,18 +212,70 @@ function show(which) {
   } catch (e) { go(); }
 })();
 
-// ---- render ----
+// ---- tabs ----
+// One long scroll meant hunting for everything. Four thumb-reachable tabs, with
+// the last one you used remembered between visits.
+const ICON = {
+  home: '<path d="M3 10.5 12 3l9 7.5"/><path d="M5.5 9.5V21h13V9.5"/>',
+  accounts: '<rect x="2.5" y="5.5" width="19" height="13" rx="2.5"/><path d="M2.5 10h19"/>',
+  ada: '<path d="M12 21s-7.5-4.7-7.5-10A4.5 4.5 0 0 1 12 8a4.5 4.5 0 0 1 7.5 3c0 5.3-7.5 10-7.5 10z"/>',
+  plan: '<path d="M4 19V5"/><path d="M4 15l5-4 4 3 7-6"/>',
+};
+const TABS = [
+  {key:"home",     label:"Home",     title:"Home"},
+  {key:"accounts", label:"Accounts", title:"Accounts"},
+  {key:"ada",      label:"Ada",      title:"Ada's Debt"},
+  {key:"plan",     label:"Plan",     title:"Plan & Spending"},
+];
+let TAB = "home";
+try { TAB = localStorage.getItem("roostTab") || "home"; } catch (e) {}
+if (!TABS.some(t => t.key === TAB)) TAB = "home";
+
+let SNAP = null, ACCOUNTS = [];
+
+function paintTabs() {
+  $("tabs").innerHTML = TABS.map(t => {
+    const on = t.key === TAB;
+    const badge = (t.key === "ada" && (SNAP?.ada?.total || 0) > 0.005)
+      ? '<span class="dot"></span>' : "";
+    return `<button class="tab" role="tab" aria-selected="${on}" data-tab="${t.key}">
+      <svg viewBox="0 0 24 24">${ICON[t.key]}</svg>${badge}
+      <span>${esc(t.label)}</span></button>`;
+  }).join("");
+  for (const b of $("tabs").querySelectorAll(".tab")) {
+    b.onclick = () => selectTab(b.dataset.tab);
+  }
+}
+
+function selectTab(key) {
+  TAB = key;
+  try { localStorage.setItem("roostTab", key); } catch (e) {}
+  paintTabs();
+  paint();
+  window.scrollTo({top:0, behavior:"instant"});
+}
+
+function paint() {
+  const t = TABS.find(x => x.key === TAB) || TABS[0];
+  $("ttl").textContent = t.title;
+  $("content").innerHTML = renderTab(TAB, SNAP, ACCOUNTS);
+}
+
+// ---- load ----
 async function load() {
+  const btn = $("rf");
+  btn.innerHTML = '<span class="spin">↻</span>';
   try {
     const [snapDoc, acctSnap] = await Promise.all([
       getDoc(doc(db, "meta", "phone_snapshot")),
       getDocs(collection(db, "accounts")),
     ]);
-    const s = snapDoc.exists() ? snapDoc.data() : null;
-    const accounts = acctSnap.docs.map(d => d.data());
-    $("content").innerHTML = view(s, accounts);
-    $("stamp").textContent = s?.generated
-      ? "updated " + new Date(s.generated).toLocaleString(undefined,
+    SNAP = snapDoc.exists() ? snapDoc.data() : null;
+    ACCOUNTS = acctSnap.docs.map(d => d.data());
+    paintTabs();
+    paint();
+    $("stamp").textContent = SNAP?.generated
+      ? "updated " + new Date(SNAP.generated).toLocaleString(undefined,
           {month:"short", day:"numeric", hour:"numeric", minute:"2-digit"})
       : "no snapshot yet";
   } catch (e) {
@@ -172,49 +283,164 @@ async function load() {
       `<div class="card"><b>Couldn't load your data.</b><div class="muted"
        style="margin-top:6px">${esc(e.message || e)}</div></div>`;
   }
+  btn.textContent = "Refresh";
+}
+$("rf").onclick = () => load();
+
+// ---- render ----
+function renderTab(tab, s, accounts) {
+  accounts = accounts || [];
+  if (tab === "accounts") return viewAccounts(s, accounts);
+  if (tab === "ada")      return viewAda(s);
+  if (tab === "plan")     return viewPlan(s);
+  return viewHome(s, accounts);
 }
 
-function view(s, accounts) {
-  const isDebt = a => a.type === "Credit Card" || a.type === "Loan";
+const isDebt = a => a.type === "Credit Card" || a.type === "Loan";
+const sumBal = xs => xs.reduce((t, a) => t + (+a.balance || 0), 0);
+
+function noSnap() {
+  return `<div class="card"><b>No snapshot yet.</b><div class="muted" style="margin-top:6px">
+    Open Roost on your PC once — it publishes the numbers this viewer reads.</div></div>`;
+}
+
+function viewHome(s, accounts) {
   const assets = accounts.filter(a => !isDebt(a));
   const debts  = accounts.filter(a =>  isDebt(a));
-  const sum = xs => xs.reduce((t, a) => t + (+a.balance || 0), 0);
-  const netWorth = s ? s.net_worth : sum(assets) - sum(debts);
-  let h = "";
-
-  // net worth
-  h += `<div class="cap">NET WORTH</div>
+  const netWorth = s ? s.net_worth : sumBal(assets) - sumBal(debts);
+  let h = `<div class="cap">NET WORTH</div>
     <div class="big ${netWorth < 0 ? "neg" : ""} mono">${money(netWorth)}</div>
-    <div class="muted" style="margin-top:4px">assets ${money(sum(assets))} · debts ${money(sum(debts))}</div>`;
+    <div class="muted" style="margin-top:4px">assets ${money(sumBal(assets))} · debts ${money(sumBal(debts))}</div>`;
+  if (!s) return h + noSnap();
 
-  // last month
-  if (s) {
-    const net = s.net ?? 0;
-    h += `<div class="cap">${esc(monthName(s.month_label))} — LAST FULL MONTH</div>
-      <div class="grid2">
-        <div class="card"><div class="tiny">FREE</div>
-          <div class="val ${net >= 0 ? "pos" : "neg"} mono">${net >= 0 ? "+" : "-"}${money(Math.abs(net))}</div>
-          <div class="tiny">after ${money(s.saved || 0)} saved</div></div>
-        <div class="card"><div class="tiny">SPENT</div>
-          <div class="val neg mono">${money(s.spending || 0)}</div>
-          <div class="tiny">in ${money(s.income || 0)}</div></div>
-      </div>`;
-    if (s.grade) {
-      const gc = "ABC".includes(s.grade) ? (s.grade === "C" ? "gold" : "pos") : "neg";
-      const arrow = s.grade_delta > 0 ? "▲" : s.grade_delta < 0 ? "▼" : "▬";
+  const net = s.net ?? 0;
+  h += `<div class="cap">${esc(monthName(s.month_label))} — LAST FULL MONTH</div>
+    <div class="grid2">
+      <div class="card"><div class="tiny">FREE</div>
+        <div class="val ${net >= 0 ? "pos" : "neg"} mono">${net >= 0 ? "+" : "-"}${money(Math.abs(net))}</div>
+        <div class="tiny">after ${money(s.saved || 0)} saved</div></div>
+      <div class="card"><div class="tiny">SPENT</div>
+        <div class="val neg mono">${money(s.spending || 0)}</div>
+        <div class="tiny">in ${money(s.income || 0)}</div></div>
+    </div>`;
+
+  if (s.grade) {
+    const gc = "ABC".includes(s.grade) ? (s.grade === "C" ? "gold" : "pos") : "neg";
+    const arrow = s.grade_delta > 0 ? "▲" : s.grade_delta < 0 ? "▼" : "▬";
+    h += `<div class="card"><div class="row">
+        <div><div class="tiny">HEALTH</div><div class="grade ${gc}">${esc(s.grade)}</div></div>
+        <div style="flex:1;text-align:right">
+          ${(s.grade_factors || []).map(f =>
+            `<div class="tiny" style="color:${f.ok ? "var(--accent-hi)" : "var(--muted)"}">
+               ${f.ok ? "✓" : "•"} ${esc(f.name)} — ${esc(f.detail)}</div>`).join("")}
+          <div class="tiny" style="margin-top:4px">${arrow} ${Math.abs(s.grade_delta || 0)} vs prior</div>
+        </div></div></div>`;
+  }
+  if (s.debt_free_label) {
+    const never = s.debt_free_never;
+    h += `<div class="cap">DEBT</div>
+      <div class="card"><div class="row">
+        <span class="muted">Debt-free</span>
+        <b class="${never ? "neg" : "gold"}">${esc(s.debt_free_label)}</b></div>
+      <div class="tiny">${never ? "minimums don't cover the interest — the planner on desktop fixes this"
+                                : "paying minimums"}</div></div>`;
+  }
+  if ((s.ada?.total || 0) > 0.005) {
+    h += `<div class="cap">ADA</div>
+      <div class="card"><div class="row">
+        <span class="muted">Ada owes you</span>
+        <b class="gold mono">${money2(s.ada.total)}</b></div>
+      <div class="tiny">across ${s.ada.groups.reduce((n,g)=>n+g.cards.length,0)} card(s) — see the Ada tab</div></div>`;
+  }
+  return h;
+}
+
+function viewAccounts(s, accounts) {
+  const assets = accounts.filter(a => !isDebt(a)).sort((x,y)=>(+y.balance||0)-(+x.balance||0));
+  const debts  = accounts.filter(a =>  isDebt(a)).sort((x,y)=>(+y.balance||0)-(+x.balance||0));
+  if (!accounts.length) {
+    return `<div class="empty"><span class="em">🗂️</span>No accounts yet.</div>`;
+  }
+  let h = "";
+  if (debts.length) {
+    h += `<div class="cap">CARDS &amp; LOANS</div>`;
+    for (const a of debts) {
       h += `<div class="card"><div class="row">
-          <div><div class="tiny">HEALTH</div><div class="grade ${gc}">${esc(s.grade)}</div></div>
-          <div style="flex:1;text-align:right">
-            ${(s.grade_factors || []).map(f =>
-              `<div class="tiny" style="color:${f.ok ? "var(--accent-hi)" : "var(--muted)"}">
-                 ${f.ok ? "✓" : "•"} ${esc(f.name)} — ${esc(f.detail)}</div>`).join("")}
-            <div class="tiny" style="margin-top:4px">${arrow} ${Math.abs(s.grade_delta || 0)} vs prior</div>
-          </div></div></div>`;
+          <div><b style="font-size:14px">${esc(a.name)}</b>
+            <div class="tiny">${(+a.apr||0)}% APR${a.min_payment ? " · min " + money2(a.min_payment) : " · no minimum set"}</div></div>
+          <span class="neg mono" style="font-weight:700">${money2(a.balance||0)}</span>
+        </div></div>`;
     }
   }
+  if (assets.length) {
+    h += `<div class="cap">CASH &amp; SAVINGS</div>`;
+    for (const a of assets) {
+      h += `<div class="card"><div class="row">
+          <div><b style="font-size:14px">${esc(a.name)}</b>
+            <div class="tiny">${esc(a.type)}${a.apr ? " · " + a.apr + "% APY" : ""}</div></div>
+          <span class="pos mono" style="font-weight:700">${money2(a.balance||0)}</span>
+        </div></div>`;
+    }
+  }
+  return h;
+}
 
-  // the plan
-  if (s?.plan?.cuts?.length) {
+// Ada's ledger, grouped by HER account with each card nested under it — the same
+// shape as the desktop screen. Settled pairs are deleted on the desktop, so
+// anything showing here is genuinely still owed.
+function viewAda(s) {
+  if (!s) return noSnap();
+  const ada = s.ada || {total:0, groups:[]};
+  if (!ada.groups || !ada.groups.length) {
+    return `<div class="empty"><span class="em">✅</span>Nothing owed.<br>
+      <span class="tiny">Charges logged on the PC show up here.</span></div>`;
+  }
+  let h = `<div class="cap">ADA OWES</div>
+    <div class="big gold mono">${money2(ada.total)}</div>
+    <div class="muted" style="margin-top:4px">across
+      ${ada.groups.reduce((n,g)=>n+g.cards.length,0)} card(s) ·
+      ${ada.groups.length} account(s)</div>
+    <div style="height:14px"></div>`;
+
+  for (const g of ada.groups) {
+    h += `<div class="acct">
+      <div class="acct-head">
+        <span class="acct-name">${esc(g.account)}</span>
+        <b class="gold mono" style="font-size:16px">${money2(g.owed)}</b>
+      </div>`;
+    for (const c of g.cards) {
+      const n = (c.lines || []).filter(l => l.kind !== "payment").length;
+      h += `<details class="cardrow"><summary>
+          <span style="display:flex;align-items:center;gap:8px;min-width:0">
+            <svg class="chev" viewBox="0 0 24 24" width="14" height="14" fill="none"
+                 stroke="currentColor" stroke-width="2.4" stroke-linecap="round"
+                 stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+            <span style="min-width:0"><b style="font-size:14px">${esc(c.card)}</b>
+              <div class="tiny">${n} charge${n === 1 ? "" : "s"}</div></span>
+          </span>
+          <b class="${c.owed < 0 ? "pos" : "gold"} mono" style="font-size:15px">${
+            c.owed < 0 ? money2(-c.owed) + " credit" : money2(c.owed)}</b>
+        </summary>
+        <div class="lines">`;
+      for (const l of (c.lines || [])) {
+        const paid = l.kind === "payment";
+        h += `<div class="line">
+            <span class="d mono">${esc((l.date || "").slice(5))}</span>
+            <span class="n">${esc(l.note || (paid ? "paid back" : "charge"))}</span>
+            <b class="mono ${paid ? "pos" : ""}">${paid ? "-" : "+"}${money2(l.amount)}</b>
+          </div>`;
+      }
+      h += `</div></details>`;
+    }
+    h += `</div>`;
+  }
+  return h;
+}
+
+function viewPlan(s) {
+  if (!s) return noSnap();
+  let h = "";
+  if (s.plan?.cuts?.length) {
     const p = s.plan;
     h += `<div class="cap">THE PLAN — WHERE TO CUT</div>
       <div class="card" style="border-color:var(--gold)">
@@ -237,41 +463,25 @@ function view(s, accounts) {
         <div class="tiny">${money(p.subs_total)}/mo across ${p.subs_count} recurring charges</div></div>`;
     }
   }
-
-  // cards & loans
-  if (debts.length) {
-    h += `<div class="cap">CARDS &amp; LOANS</div>`;
-    if (s?.debt_free_label) {
-      const never = s.debt_free_never;
-      h += `<div class="card"><div class="row">
-          <span class="muted">Debt-free</span>
-          <b class="${never ? "neg" : "gold"}">${esc(s.debt_free_label)}</b></div>
-        <div class="tiny">${never ? "minimums don't cover the interest — the planner on desktop fixes this"
-                                  : "paying minimums"}</div></div>`;
-    }
-    for (const a of debts.sort((x, y) => (+y.balance||0) - (+x.balance||0))) {
-      h += `<div class="card"><div class="row">
-          <div><b style="font-size:14px">${esc(a.name)}</b>
-            <div class="tiny">${(+a.apr||0)}% APR${a.min_payment ? " · min " + money2(a.min_payment) : " · no minimum set"}</div></div>
-          <span class="neg mono" style="font-weight:700">${money2(a.balance||0)}</span>
-        </div></div>`;
+  if (s.watchdog?.length) {
+    h += `<div class="cap">WATCHDOG</div>`;
+    for (const t of s.watchdog) {
+      h += `<div class="card note bad"><div style="font-size:13px">🐕 ${esc(t)}</div></div>`;
     }
   }
-
-  // cash
-  if (assets.length) {
-    h += `<div class="cap">CASH &amp; SAVINGS</div>`;
-    for (const a of assets.sort((x, y) => (+y.balance||0) - (+x.balance||0))) {
-      h += `<div class="card"><div class="row">
-          <div><b style="font-size:14px">${esc(a.name)}</b>
-            <div class="tiny">${esc(a.type)}${a.apr ? " · " + a.apr + "% APY" : ""}</div></div>
-          <span class="pos mono" style="font-weight:700">${money2(a.balance||0)}</span>
-        </div></div>`;
+  if (s.top_spending?.length) {
+    const peak = s.top_spending[0].amount || 1;
+    h += `<div class="cap">TOP SPENDING</div><div class="card">`;
+    for (const t of s.top_spending) {
+      h += `<div style="margin-bottom:10px">
+          <div class="row"><span style="font-size:13px">${esc(t.category)}</span>
+            <b class="mono" style="font-size:13px">${money(t.amount)}</b></div>
+          <div class="bar"><i style="width:${Math.round(t.amount/peak*100)}%"></i></div>
+        </div>`;
     }
+    h += `</div>`;
   }
-
-  // milestones
-  if (s?.wins && (s.wins.paid_down > 0 || (s.wins.killed || []).length)) {
+  if (s.wins && (s.wins.paid_down > 0 || (s.wins.killed || []).length)) {
     const w = s.wins;
     h += `<div class="cap">MILESTONES</div><div class="card">
       <div class="row"><span class="muted">Paid down</span>
@@ -291,39 +501,14 @@ function view(s, accounts) {
     }
     h += `</div>`;
   }
-
-  // watchdog
-  if (s?.watchdog?.length) {
-    h += `<div class="cap">WATCHDOG</div>`;
-    for (const t of s.watchdog) {
-      h += `<div class="card note bad"><div style="font-size:13px">🐕 ${esc(t)}</div></div>`;
-    }
-  }
-
-  // top spending
-  if (s?.top_spending?.length) {
-    const peak = s.top_spending[0].amount || 1;
-    h += `<div class="cap">TOP SPENDING</div><div class="card">`;
-    for (const t of s.top_spending) {
-      h += `<div style="margin-bottom:10px">
-          <div class="row"><span style="font-size:13px">${esc(t.category)}</span>
-            <b class="mono" style="font-size:13px">${money(t.amount)}</b></div>
-          <div class="bar"><i style="width:${Math.round(t.amount/peak*100)}%"></i></div>
-        </div>`;
-    }
-    h += `</div>`;
-  }
-
-  if (!s) {
-    h += `<div class="card"><b>No snapshot yet.</b><div class="muted" style="margin-top:6px">
-      Open Roost on your PC once — it publishes the numbers this viewer reads.</div></div>`;
-  }
-  return h;
+  return h || `<div class="empty"><span class="em">📋</span>No plan yet.<br>
+    <span class="tiny">Import a statement on the PC and the coach fills this in.</span></div>`;
 }
 
 // Exposed for debugging: render any snapshot without hitting the network.
-// Pure function, no data or credentials of its own.
-window.roostRender = (s, accounts) => view(s, accounts || []);
+// Pure function, no data or credentials of its own. Pass a tab key to pick one.
+window.roostRender = (s, accounts, tab) => renderTab(tab || TAB, s, accounts || []);
+window.roostTabs = TABS.map(t => t.key);
 
 function monthName(ym) {
   if (!ym) return "LAST MONTH";
@@ -331,6 +516,8 @@ function monthName(ym) {
   return new Date(y, (m || 1) - 1, 1)
     .toLocaleString(undefined, { month: "long" }).toUpperCase();
 }
+
+paintTabs();
 </script>
 </body>
 </html>
