@@ -11,7 +11,7 @@
  * nothing. The cache is only a fallback for when the phone is actually offline.
  * Firestore/Firebase traffic is cross-origin and is never touched here.
  */
-const VERSION = "roost-v6";
+const VERSION = "roost-v8";
 const SHELL = [
   "./",
   "./index.html",
@@ -56,7 +56,11 @@ self.addEventListener("fetch", event => {
     } catch (e) {
       // Offline: fall back to whatever we have, then to the app shell so a
       // navigation still opens the app rather than the browser's error page.
-      const hit = await caches.match(req);
+      // ignoreSearch: the start_url and any ?query land on the same page, and a
+      // miss here is not just a cosmetic offline failure - Chrome's install
+      // check fetches start_url through this worker, and a page that can't
+      // answer it is treated as not installable.
+      const hit = await caches.match(req, { ignoreSearch: true });
       if (hit) return hit;
       if (req.mode === "navigate") {
         const shell = await caches.match("./index.html");

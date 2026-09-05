@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#12141a">
 <meta http-equiv="Cache-Control" content="no-cache, must-revalidate">
-<meta name="build" content="6">
+<meta name="build" content="8">
 <!-- Home-screen install: opens standalone (no browser bars), own icon. -->
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -79,9 +79,9 @@
     background:rgba(18,20,26,.96);backdrop-filter:blur(12px);
     border-top:1px solid var(--border);
     padding-bottom:env(safe-area-inset-bottom)}
-  .tabbar-in{max-width:560px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr)}
+  .tabbar-in{max-width:560px;margin:0 auto;display:grid;grid-template-columns:repeat(5,1fr)}
   .tab{background:none;border:none;color:var(--muted);
-    min-height:58px;padding:9px 4px 7px;display:flex;flex-direction:column;
+    min-height:58px;padding:9px 2px 7px;display:flex;flex-direction:column;
     align-items:center;justify-content:center;gap:4px;font-size:11px;font-weight:600}
   .tab svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.9;
     stroke-linecap:round;stroke-linejoin:round}
@@ -109,6 +109,64 @@
   .line .n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .empty{text-align:center;color:var(--muted);padding:40px 16px;font-size:13px}
   .empty .em{font-size:34px;display:block;margin-bottom:10px;opacity:.65}
+
+  /* ---- install prompt -------------------------------------------------- */
+  /* Shown only when Chrome says the page is installable, which it only does
+     when it is NOT already installed. A home-screen icon made with "Add
+     shortcut" instead of "Install" opens in a browser tab, and this is the one
+     tap that fixes it. */
+  #installbar{max-width:560px;margin:12px auto 0;padding:0 16px}
+  #installbar .card{display:flex;align-items:center;gap:12px;border-color:var(--accent);
+    margin-bottom:0}
+  #installbar .go{background:var(--accent);color:#fff;border:none;border-radius:9px;
+    padding:9px 14px;font-weight:700;font-size:13px;flex:none}
+  #installbar .no{background:none;border:none;color:var(--muted);font-size:18px;
+    padding:2px 4px;flex:none}
+
+  /* ---- spend log ------------------------------------------------------- */
+  .amtrow{display:flex;align-items:center;gap:6px;background:var(--surface2);
+    border:1px solid var(--border);border-radius:12px;padding:2px 14px}
+  .amtrow .cur{font-size:24px;color:var(--muted);font-weight:300}
+  #amt{font-size:32px;font-weight:600;border:none;background:none;padding:12px 0;
+    margin:0;letter-spacing:-.5px}
+  #amt:focus{outline:none}
+  .entryrow{display:flex;gap:8px;margin-top:8px}
+  /* The base rule gives every input width:100%; inside a flex row that has to be
+     undone or the text field collapses to nothing beside the date picker. */
+  .entryrow>input{margin:0;font-size:14px;padding:11px 12px;flex:1 1 auto;
+    width:auto;min-width:0}
+  .entryrow>input.datepill,.entryrow>button{flex:0 0 auto;width:auto}
+  .datepill{background:var(--surface2);border:1px solid var(--border);color:var(--text);
+    border-radius:8px;padding:0 12px;min-height:44px;font-size:13px;white-space:nowrap;flex:none}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+  .chip{background:var(--surface2);border:1px solid var(--border);color:var(--text);
+    border-radius:99px;padding:0 15px;min-height:44px;font-size:14px;font-weight:600}
+  .chip:active{background:var(--accent);border-color:var(--accent);color:#fff}
+  .chip.add{color:var(--accent-hi);border-style:dashed}
+  .grouphead{color:var(--muted);font-size:10px;font-weight:700;letter-spacing:1.6px;
+    width:100%;margin:10px 0 -2px}
+  details.more>summary{list-style:none;color:var(--muted);font-size:12px;padding:12px 2px;
+    cursor:pointer}
+  details.more>summary::-webkit-details-marker{display:none}
+  .ent{display:flex;align-items:center;gap:10px;padding:10px 0;
+    border-top:1px solid var(--border)}
+  .ent:first-child{border-top:none}
+  .ent .x{background:none;border:none;color:var(--muted);font-size:16px;
+    padding:6px 2px 6px 8px;line-height:1;flex:none}
+  .daysep{color:var(--muted);font-size:11px;font-weight:700;letter-spacing:1.4px;
+    margin:14px 0 4px}
+  .toast{position:fixed;left:50%;transform:translateX(-50%);
+    bottom:calc(var(--tabbar) + env(safe-area-inset-bottom) + 14px);z-index:40;
+    background:var(--surface2);border:1px solid var(--border);border-radius:12px;
+    padding:12px 14px;display:flex;align-items:center;gap:16px;font-size:13px;
+    box-shadow:0 10px 28px rgba(0,0,0,.5);max-width:92vw}
+  .toast button{background:none;border:none;color:var(--gold-hi);font-weight:700;
+    font-size:13px;padding:2px}
+  .hint{color:var(--danger);font-size:12px;min-height:16px;margin-top:6px}
+  #diagout .card{text-align:left;margin-top:10px}
+  #diagout .row{padding:4px 0;font-size:12px;align-items:flex-start}
+  #diagout .v{text-align:right;font-weight:700}
+  #diagout .v.y{color:var(--accent-hi)} #diagout .v.n{color:var(--danger)}
 </style>
 </head>
 <body>
@@ -128,12 +186,23 @@
     <button class="refresh" id="rf">Refresh</button>
   </div></div>
 
+  <div id="installbar" style="display:none"><div class="card">
+    <div style="flex:1">
+      <b style="font-size:14px">Install Roost</b>
+      <div class="tiny">This is running in the browser. Installing gives it its own
+        icon with no address bar.</div>
+    </div>
+    <button class="go" id="doinstall">Install</button>
+    <button class="no" id="noinstall" aria-label="Not now">&times;</button>
+  </div></div>
+
   <div class="wrap">
     <div id="content"><div class="card">Loading your numbers…</div></div>
     <div class="foot">
-      Read-only viewer · <span id="stamp"></span><br>
-      <a href="#" id="out">Sign out</a>
+      Read-only viewer &middot; <span id="stamp"></span><br>
+      <a href="#" id="diag">App status</a> &middot; <a href="#" id="out">Sign out</a>
     </div>
+    <div id="diagout"></div>
   </div>
 
   <nav class="tabbar"><div class="tabbar-in" id="tabs"></div></nav>
@@ -149,6 +218,16 @@ if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("sw.js").catch(() => {});
   });
 }
+
+// Chrome fires beforeinstallprompt early — often before the module below has
+// finished loading — and the event is only usable if it was captured. Stash it
+// here; the module picks it up and shows the Install bar.
+window.__installEvt = null;
+window.addEventListener("beforeinstallprompt", e => {
+  e.preventDefault();                    // keep Chrome's own mini-infobar away
+  window.__installEvt = e;
+  if (window.__onInstallable) window.__onInstallable();
+});
 
 // Fail-safe: if the module below never runs (CDN blocked, old browser, syntax
 // error) the sign-in form is already visible, and this surfaces the reason
@@ -169,7 +248,9 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/fireba
 import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut,
          setPersistence, browserLocalPersistence }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { getFirestore, collection, getDocs, doc, getDoc }
+import { getFirestore, initializeFirestore, persistentLocalCache,
+         persistentMultipleTabManager,
+         collection, getDocs, doc, getDoc, setDoc, deleteDoc, query, where }
   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const app = initializeApp({
@@ -178,7 +259,20 @@ const app = initializeApp({
   projectId: "roost-d123c",
 });
 const auth = getAuth(app);
-const db = getFirestore(app);
+// Persistent cache so a purchase logged in a store with no signal is queued and
+// sent when the phone reconnects, instead of being lost. Falls back to the plain
+// in-memory client if the browser refuses (private mode, old WebView) — a failure
+// here must never cost him the app.
+let db;
+try {
+  // Multi-tab manager: with the single-tab default, a second open tab fails to
+  // take the lease and its first read throws.
+  db = initializeFirestore(app, {
+    localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+  });
+} catch (e) {
+  db = getFirestore(app);
+}
 
 const $ = id => document.getElementById(id);
 const money = n => (n < 0 ? "-" : "") + "$" + Math.abs(Math.round(n)).toLocaleString();
@@ -230,9 +324,11 @@ const ICON = {
   accounts: '<rect x="2.5" y="5.5" width="19" height="13" rx="2.5"/><path d="M2.5 10h19"/>',
   ada: '<path d="M12 21s-7.5-4.7-7.5-10A4.5 4.5 0 0 1 12 8a4.5 4.5 0 0 1 7.5 3c0 5.3-7.5 10-7.5 10z"/>',
   plan: '<path d="M4 19V5"/><path d="M4 15l5-4 4 3 7-6"/>',
+  spend: '<circle cx="12" cy="12" r="9"/><path d="M12 7.5v9"/><path d="M9.5 15h4a1.75 1.75 0 0 0 0-3.5h-3a1.75 1.75 0 0 1 0-3.5h4"/>',
 };
 const TABS = [
   {key:"home",     label:"Home",     title:"Home"},
+  {key:"spend",    label:"Spend",    title:"This Week"},
   {key:"accounts", label:"Accounts", title:"Accounts"},
   {key:"ada",      label:"Ada",      title:"Ada's Debt"},
   {key:"plan",     label:"Plan",     title:"Plan & Spending"},
@@ -242,6 +338,7 @@ try { TAB = localStorage.getItem("roostTab") || "home"; } catch (e) {}
 if (!TABS.some(t => t.key === TAB)) TAB = "home";
 
 let SNAP = null, ACCOUNTS = [];
+let SPEND = [], CATS = [], BUDGET = 0, WEEK_START = 0;
 
 function paintTabs() {
   $("tabs").innerHTML = TABS.map(t => {
@@ -269,6 +366,7 @@ function paint() {
   const t = TABS.find(x => x.key === TAB) || TABS[0];
   $("ttl").textContent = t.title;
   $("content").innerHTML = renderTab(TAB, SNAP, ACCOUNTS);
+  if (TAB === "spend") wireSpend();      // innerHTML wiped the old listeners
 }
 
 // ---- load ----
@@ -276,12 +374,23 @@ async function load() {
   const btn = $("rf");
   btn.innerHTML = '<span class="spin">↻</span>';
   try {
-    const [snapDoc, acctSnap] = await Promise.all([
+    // Only the last ~4 months of the log — enough for the 4-week stats with room
+    // to spare, and it keeps the read small as the log grows year over year.
+    const since = isoDate(addDays(new Date(), -120));
+    const [snapDoc, acctSnap, setDocSnap, logSnap, catSnap] = await Promise.all([
       getDoc(doc(db, "meta", "phone_snapshot")),
       getDocs(collection(db, "accounts")),
+      getDoc(doc(db, "meta", "spend_settings")),
+      getDocs(query(collection(db, "spend_log"), where("date", ">=", since))),
+      getDocs(collection(db, "categories")),
     ]);
     SNAP = snapDoc.exists() ? snapDoc.data() : null;
     ACCOUNTS = acctSnap.docs.map(d => d.data());
+    const st = setDocSnap.exists() ? setDocSnap.data() : {};
+    BUDGET = +st.weekly_budget || 0;
+    WEEK_START = Number.isInteger(st.week_start) ? st.week_start : 0;   // 0 = Sunday
+    SPEND = logSnap.docs.map(d => ({ ...d.data(), _id: d.id }));
+    CATS = catSnap.docs.map(d => d.data()).filter(c => c && c.name);
     paintTabs();
     paint();
     $("stamp").textContent = SNAP?.generated
@@ -300,6 +409,7 @@ $("rf").onclick = () => load();
 // ---- render ----
 function renderTab(tab, s, accounts) {
   accounts = accounts || [];
+  if (tab === "spend")    return viewSpend();
   if (tab === "accounts") return viewAccounts(s, accounts);
   if (tab === "ada")      return viewAda(s);
   if (tab === "plan")     return viewPlan(s);
@@ -514,6 +624,403 @@ function viewPlan(s) {
   return h || `<div class="empty"><span class="em">📋</span>No plan yet.<br>
     <span class="tiny">Import a statement on the PC and the coach fills this in.</span></div>`;
 }
+
+// ---- spend log: the weekly tally --------------------------------------------
+// Deliberately its OWN ledger, in `spend_log`. It never writes a transaction and
+// never feeds cash flow, net worth or the payoff math - so when the bank
+// statement lands weeks later and imports the same purchase, nothing can be
+// counted twice. This is the running total that keeps the week honest; the
+// desktop stays the source of truth for what actually left the account.
+
+function addDays(d, n) { const x = new Date(d); x.setDate(x.getDate() + n); return x; }
+function isoDate(d) {
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0")
+    + "-" + String(d.getDate()).padStart(2, "0");
+}
+function weekStartOf(d) {
+  const x = new Date(d); x.setHours(0, 0, 0, 0);
+  x.setDate(x.getDate() - ((x.getDay() - WEEK_START + 7) % 7));
+  return x;
+}
+const dayLabel = iso => {
+  const [y, m, dd] = iso.split("-").map(Number);
+  return new Date(y, m - 1, dd).toLocaleDateString(undefined,
+    { weekday: "short", month: "short", day: "numeric" }).toUpperCase();
+};
+const spanLabel = (a, b) => {
+  const f = d => d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  return f(a) + " to " + f(b);
+};
+const between = (iso, a, b) => iso >= a && iso <= b;
+const sumOf = xs => xs.reduce((t, e) => t + (+e.amount || 0), 0);
+
+// Kept outside the render so a re-render never eats what he is typing.
+let DRAFT = { amt: "", note: "", date: "" };
+let NEWCAT = false;
+
+// The starters only matter until he has logged anything; after that his own
+// habits order the chips.
+const STARTER_CATS = ["Groceries", "Restaurants", "Fuel", "Coffee", "Fast Food",
+                      "Household", "General/Amazon", "Entertainment"];
+
+function topCategories(n) {
+  const since = isoDate(addDays(new Date(), -60));
+  const count = {};
+  for (const e of SPEND) if (e.date >= since && e.category)
+    count[e.category] = (count[e.category] || 0) + 1;
+  const out = Object.keys(count).sort((a, b) => count[b] - count[a]);
+  for (const c of STARTER_CATS) if (out.length < n && !out.includes(c)) out.push(c);
+  return out.slice(0, n);
+}
+
+function byCategory(entries) {
+  const t = {};
+  for (const e of entries) {
+    const k = e.category || "Uncategorized";
+    t[k] = (t[k] || 0) + (+e.amount || 0);
+  }
+  return Object.entries(t).map(([category, amount]) => ({ category, amount }))
+    .sort((a, b) => b.amount - a.amount);
+}
+
+function viewSpend() {
+  const today = new Date();
+  const ws = weekStartOf(today), we = addDays(ws, 6);
+  const wsI = isoDate(ws), weI = isoDate(we);
+  const week = SPEND.filter(e => between(e.date, wsI, weI));
+  const spent = sumOf(week);
+  const left = BUDGET - spent;
+  const daysLeft = Math.max(0,
+    Math.round((we - new Date(isoDate(today) + "T00:00:00")) / 86400000) + 1);
+
+  // ---- the week ----
+  let h = `<div class="cap">${esc(spanLabel(ws, we))}</div>
+    <div class="big ${BUDGET && left < 0 ? "neg" : ""} mono">${money2(spent)}</div>`;
+  if (BUDGET > 0) {
+    const pct = Math.min(100, Math.round(spent / BUDGET * 100));
+    h += `<div class="muted" style="margin-top:4px">of ${money(BUDGET)} &middot;
+        <b class="${left < 0 ? "neg" : "pos"}">${left < 0 ? money2(-left) + " over"
+                                                          : money2(left) + " left"}</b></div>
+      <div class="bar"><i style="width:${pct}%;background:${
+        left < 0 ? "var(--danger)" : pct > 80 ? "var(--gold)" : "var(--accent)"}"></i></div>`;
+    if (left > 0 && daysLeft > 0) {
+      h += `<div class="tiny" style="margin-top:6px">${money2(left / daysLeft)} a day
+        for the ${daysLeft} day${daysLeft === 1 ? "" : "s"} left</div>`;
+    } else if (left < 0) {
+      h += `<div class="tiny neg" style="margin-top:6px">over budget with
+        ${daysLeft} day${daysLeft === 1 ? "" : "s"} still to go</div>`;
+    }
+  } else {
+    h += `<div class="muted" style="margin-top:4px">no weekly budget set</div>`;
+  }
+  h += `<details class="more"><summary>${BUDGET > 0 ? "Change the weekly budget"
+                                                    : "Set a weekly budget"}</summary>
+    <div class="entryrow">
+      <input id="bud" inputmode="decimal" placeholder="0" value="${BUDGET || ""}">
+      <button class="datepill" id="budsave" style="color:var(--accent-hi)">Save</button>
+    </div></details>`;
+
+  // ---- log a payment ----
+  h += `<div class="cap">LOG A PAYMENT</div>
+    <div class="amtrow"><span class="cur">$</span>
+      <input id="amt" inputmode="decimal" placeholder="0.00" value="${esc(DRAFT.amt)}"></div>
+    <div class="entryrow">
+      <input id="note" placeholder="Note (optional)" value="${esc(DRAFT.note)}">
+      <input class="datepill" type="date" id="dinp" value="${esc(DRAFT.date || isoDate(today))}">
+    </div>
+    <div class="hint" id="hint"></div>
+    <div class="chips">`;
+  for (const c of topCategories(8)) {
+    h += `<button class="chip" data-cat="${esc(c)}">${esc(c)}</button>`;
+  }
+  h += `<button class="chip add" id="newcat">+ New</button></div>`;
+  if (NEWCAT) {
+    h += `<div class="entryrow">
+        <input id="catname" placeholder="New category name" autocomplete="off">
+        <button class="datepill" id="catsave" style="color:var(--accent-hi)">Add</button>
+      </div>`;
+  }
+
+  const groups = {};
+  for (const c of CATS) {
+    const g = c.group || "Other";
+    (groups[g] = groups[g] || []).push(c.name);
+  }
+  const groupNames = Object.keys(groups).sort();
+  if (groupNames.length) {
+    h += `<details class="more"><summary>All categories</summary><div class="chips">`;
+    for (const g of groupNames) {
+      h += `<div class="grouphead">${esc(g.toUpperCase())}</div>`;
+      for (const name of groups[g].slice().sort()) {
+        h += `<button class="chip" data-cat="${esc(name)}">${esc(name)}</button>`;
+      }
+    }
+    h += `</div></details>`;
+  }
+  h += `<div class="tiny" style="margin-top:10px">Type the amount, tap a category.
+    This is your own tally, it doesn't touch your accounts, net worth or the payoff plan.</div>`;
+
+  // ---- this week's entries ----
+  if (week.length) {
+    h += `<div class="cap">THIS WEEK &mdash; ${week.length} PAYMENT${week.length === 1 ? "" : "S"}</div>`;
+    const days = [...new Set(week.map(e => e.date))].sort().reverse();
+    for (const d of days) {
+      const rows = week.filter(e => e.date === d)
+        .sort((a, b) => String(b.created || "").localeCompare(String(a.created || "")));
+      h += `<div class="daysep">${esc(dayLabel(d))} &middot; ${money2(sumOf(rows))}</div><div class="card">`;
+      for (const e of rows) {
+        h += `<div class="ent">
+            <b class="mono" style="font-size:15px;min-width:74px">${money2(e.amount)}</b>
+            <span style="flex:1;min-width:0">
+              <span style="font-size:13px">${esc(e.category || "Uncategorized")}</span>
+              ${e.note ? `<div class="tiny">${esc(e.note)}</div>` : ""}
+            </span>
+            <button class="x" data-del="${esc(e._id)}" aria-label="Delete">&times;</button>
+          </div>`;
+      }
+      h += `</div>`;
+    }
+
+    const cats = byCategory(week);
+    const peak = cats[0].amount || 1;
+    h += `<div class="cap">WHERE IT WENT THIS WEEK</div><div class="card">`;
+    for (const c of cats) {
+      h += `<div style="margin-bottom:10px">
+          <div class="row"><span style="font-size:13px">${esc(c.category)}</span>
+            <b class="mono" style="font-size:13px">${money2(c.amount)}</b></div>
+          <div class="bar"><i style="width:${Math.round(c.amount / peak * 100)}%"></i></div>
+        </div>`;
+    }
+    h += `</div>`;
+  } else {
+    h += `<div class="cap">THIS WEEK</div>
+      <div class="empty"><span class="em">&#129534;</span>Nothing logged yet this week.</div>`;
+  }
+
+  // ---- the four weeks behind it: what to cut ----
+  const weeks = [];
+  for (let i = 1; i <= 4; i++) {
+    const a = addDays(ws, -7 * i), b = addDays(a, 6);
+    weeks.push({ a, b, entries: SPEND.filter(e => between(e.date, isoDate(a), isoDate(b))) });
+  }
+  const past = weeks.filter(w => w.entries.length);
+  if (past.length) {
+    const avg = past.reduce((t, w) => t + sumOf(w.entries), 0) / past.length;
+    h += `<div class="cap">THE FOUR WEEKS BEFORE</div><div class="card">`;
+    for (const w of past) {
+      const tot = sumOf(w.entries);
+      const over = BUDGET > 0 ? tot - BUDGET : 0;
+      h += `<div class="row" style="padding:5px 0">
+          <span class="muted" style="font-size:12px">${esc(spanLabel(w.a, w.b))}</span>
+          <span><b class="mono" style="font-size:13px">${money2(tot)}</b>
+            ${BUDGET > 0 ? `<span class="tiny ${over > 0 ? "neg" : "pos"}">
+              ${over > 0 ? " +" + money(over) + " over" : " " + money(-over) + " under"}</span>` : ""}</span>
+        </div>`;
+    }
+    h += `<div class="row" style="border-top:1px solid var(--border);margin-top:6px;padding-top:8px">
+        <span class="muted" style="font-size:12px">Weekly average</span>
+        <b class="mono ${BUDGET > 0 && avg > BUDGET ? "neg" : ""}" style="font-size:13px">${money2(avg)}</b>
+      </div></div>`;
+
+    const all = past.flatMap(w => w.entries);
+    const cats = byCategory(all).slice(0, 6);
+    const peak = cats[0].amount || 1;
+    h += `<div class="cap">WHERE TO CUT &mdash; LAST 4 WEEKS</div><div class="card">`;
+    for (const c of cats) {
+      h += `<div style="margin-bottom:10px">
+          <div class="row"><span style="font-size:13px">${esc(c.category)}</span>
+            <span><b class="mono" style="font-size:13px">${money2(c.amount)}</b>
+              <span class="tiny"> ${money2(c.amount / past.length)}/wk</span></span></div>
+          <div class="bar"><i style="width:${Math.round(c.amount / peak * 100)}%"></i></div>
+        </div>`;
+    }
+    h += `</div>`;
+  }
+  return h;
+}
+
+function wireSpend() {
+  const amt = $("amt"), note = $("note"), dinp = $("dinp");
+  if (amt) amt.oninput = () => { DRAFT.amt = amt.value; };
+  if (note) note.oninput = () => { DRAFT.note = note.value; };
+  if (dinp) dinp.onchange = () => { DRAFT.date = dinp.value; };
+  if (amt) amt.addEventListener("keydown", e => { if (e.key === "Enter") amt.blur(); });
+
+  for (const b of document.querySelectorAll("[data-cat]")) {
+    b.onclick = () => logSpend(b.dataset.cat);
+  }
+  for (const b of document.querySelectorAll("[data-del]")) {
+    b.onclick = () => removeEntry(b.dataset.del);
+  }
+
+  const nc = $("newcat");
+  if (nc) nc.onclick = () => { NEWCAT = !NEWCAT; paint(); const f = $("catname"); if (f) f.focus(); };
+  const cs = $("catsave"), cn = $("catname");
+  if (cs) cs.onclick = () => addCategory(cn ? cn.value : "");
+  if (cn) cn.addEventListener("keydown", e => { if (e.key === "Enter") addCategory(cn.value); });
+
+  const bs = $("budsave"), bud = $("bud");
+  if (bs) bs.onclick = () => saveBudget(bud ? bud.value : "");
+  if (bud) bud.addEventListener("keydown", e => { if (e.key === "Enter") saveBudget(bud.value); });
+}
+
+function hint(msg) {
+  const el = $("hint");
+  if (el) el.textContent = msg;
+}
+
+// Writes are optimistic: the list updates now and the network catches up. With
+// the persistent cache an offline write is queued, so awaiting it before showing
+// anything would leave him staring at a dead screen in a checkout line.
+function logSpend(category) {
+  const amount = Math.round(parseFloat(String(DRAFT.amt).replace(/[^0-9.]/g, "")) * 100) / 100;
+  if (!(amount > 0)) {
+    hint("Enter an amount first.");
+    const a = $("amt"); if (a) a.focus();
+    return;
+  }
+  const rec = {
+    date: DRAFT.date || isoDate(new Date()),
+    amount: amount,
+    category: category,
+    note: (DRAFT.note || "").trim(),
+    created: new Date().toISOString(),
+  };
+  const ref = doc(collection(db, "spend_log"));
+  SPEND.push({ ...rec, _id: ref.id });
+  DRAFT.amt = ""; DRAFT.note = "";
+  NEWCAT = false;
+  paint();
+  setDoc(ref, rec).catch(e => toast("Couldn't save that: " + (e.message || e)));
+  toast("Logged " + money2(amount) + " · " + category, "Undo", () => removeEntry(ref.id));
+}
+
+function removeEntry(id) {
+  SPEND = SPEND.filter(e => e._id !== id);
+  paint();
+  deleteDoc(doc(db, "spend_log", id))
+    .catch(e => toast("Couldn't delete that: " + (e.message || e)));
+}
+
+// New categories go into the SAME `categories` collection the desktop uses, in
+// the desktop's own shape, so one list serves both and the stats line up.
+function addCategory(raw) {
+  const name = String(raw || "").trim();
+  if (!name) { hint("Name the category first."); return; }
+  const existing = CATS.find(c => (c.name || "").toLowerCase() === name.toLowerCase());
+  if (!existing) {
+    const id = (self.crypto && crypto.randomUUID) ? crypto.randomUUID()
+      : "c" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    const cat = { id: id, name: name, group: "Other", custom: true };
+    CATS.push(cat);
+    setDoc(doc(db, "categories", id), cat)
+      .catch(e => toast("Couldn't save the category: " + (e.message || e)));
+  }
+  NEWCAT = false;
+  const amount = parseFloat(String(DRAFT.amt).replace(/[^0-9.]/g, ""));
+  if (amount > 0) logSpend(existing ? existing.name : name);  // amount typed: log it now
+  else paint();                                               // otherwise just keep the chip
+}
+
+function saveBudget(raw) {
+  const v = Math.round(parseFloat(String(raw).replace(/[^0-9.]/g, "")) * 100) / 100;
+  if (!(v >= 0)) return;
+  BUDGET = v;
+  paint();
+  setDoc(doc(db, "meta", "spend_settings"),
+         { weekly_budget: v, week_start: WEEK_START }, { merge: true })
+    .catch(e => toast("Couldn't save the budget: " + (e.message || e)));
+  toast("Weekly budget " + money(v));
+}
+
+let TOAST_T = null;
+function toast(msg, actionLabel, action) {
+  const old = document.querySelector(".toast");
+  if (old) old.remove();
+  if (TOAST_T) clearTimeout(TOAST_T);
+  const el = document.createElement("div");
+  el.className = "toast";
+  el.innerHTML = `<span>${esc(msg)}</span>`;
+  if (actionLabel) {
+    const b = document.createElement("button");
+    b.textContent = actionLabel;
+    b.onclick = () => { el.remove(); if (action) action(); };
+    el.appendChild(b);
+  }
+  document.body.appendChild(el);
+  TOAST_T = setTimeout(() => el.remove(), 6000);
+}
+
+// ---- install ----------------------------------------------------------------
+// A home-screen icon made with "Add to Home screen" (a shortcut) opens in a
+// browser tab, address bar and all. Chrome only fires beforeinstallprompt when
+// the page is genuinely installable AND not already installed, so this bar
+// appears exactly when there is something to fix, and one tap fixes it.
+function showInstall() {
+  if (!window.__installEvt) return;
+  try { if (matchMedia("(display-mode: standalone)").matches) return; } catch (e) {}
+  try { if (sessionStorage.getItem("roostNoInstall")) return; } catch (e) {}
+  $("installbar").style.display = "block";
+}
+window.__onInstallable = showInstall;
+$("doinstall").onclick = async () => {
+  const e = window.__installEvt;
+  if (!e) return;
+  $("installbar").style.display = "none";
+  e.prompt();
+  try { await e.userChoice; } catch (_) {}
+  window.__installEvt = null;
+};
+$("noinstall").onclick = () => {
+  $("installbar").style.display = "none";
+  try { sessionStorage.setItem("roostNoInstall", "1"); } catch (e) {}
+};
+window.addEventListener("appinstalled", () => {
+  window.__installEvt = null;
+  $("installbar").style.display = "none";
+});
+showInstall();
+
+// "App status" in the footer. When the home-screen icon opens in a browser tab
+// anyway, this is the phone answering for itself instead of us guessing from a
+// desk: it names which of Chrome's install conditions this device actually sees.
+$("diag").onclick = async e => {
+  e.preventDefault();
+  const box = $("diagout");
+  if (box.innerHTML) { box.innerHTML = ""; return; }
+  const yn = (ok, yes, no) => `<span class="v ${ok ? "y" : "n"}">${ok ? yes : no}</span>`;
+
+  let standalone = false;
+  try { standalone = matchMedia("(display-mode: standalone)").matches; } catch (_) {}
+  let reg = null;
+  try { reg = await navigator.serviceWorker.getRegistration(); } catch (_) {}
+  let manifestOk = false, startCached = false, startUrl = "";
+  try {
+    const mf = await fetch("manifest.webmanifest", { cache: "no-store" }).then(r => r.json());
+    manifestOk = !!(mf && mf.name && (mf.icons || []).length);
+    startUrl = new URL(mf.start_url || "./", location.href).href;
+    startCached = !!(await caches.match(startUrl, { ignoreSearch: true }));
+  } catch (_) {}
+
+  box.innerHTML = `<div class="card">
+    <div class="row"><span class="muted">Running as</span>
+      ${yn(standalone, "installed app", "browser tab")}</div>
+    <div class="row"><span class="muted">Chrome offered an install</span>
+      ${yn(!!window.__installEvt, "yes", "not yet")}</div>
+    <div class="row"><span class="muted">Service worker</span>
+      ${yn(!!(reg && reg.active), reg && reg.active ? reg.active.state : "", "none")}</div>
+    <div class="row"><span class="muted">Manifest</span>
+      ${yn(manifestOk, "loaded", "failed")}</div>
+    <div class="row"><span class="muted">Offline copy of the start page</span>
+      ${yn(startCached, "ready", "missing")}</div>
+    <div class="row"><span class="muted">Build</span>
+      <span class="v">${esc(document.querySelector('meta[name=build]').content)}</span></div>
+    <div class="tiny" style="margin-top:8px">${standalone
+      ? "This is the installed app."
+      : "In Chrome: menu, Add to home screen. If that sheet offers Install, take it, "
+        + "the plain shortcut is what opens with an address bar. Delete the old icon after."}</div>
+  </div>`;
+};
 
 // Exposed for debugging: render any snapshot without hitting the network.
 // Pure function, no data or credentials of its own. Pass a tab key to pick one.
