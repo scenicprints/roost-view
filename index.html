@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#12141a">
 <meta http-equiv="Cache-Control" content="no-cache, must-revalidate">
-<meta name="build" content="8">
+<meta name="build" content="9">
 <!-- Home-screen install: opens standalone (no browser bars), own icon. -->
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -163,6 +163,9 @@
   .toast button{background:none;border:none;color:var(--gold-hi);font-weight:700;
     font-size:13px;padding:2px}
   .hint{color:var(--danger);font-size:12px;min-height:16px;margin-top:6px}
+  .src{display:inline-block;border:1px solid var(--border);border-radius:99px;
+    padding:1px 7px;font-size:10px;color:var(--muted);margin-left:6px;
+    vertical-align:1px}
   #diagout .card{text-align:left;margin-top:10px}
   #diagout .row{padding:4px 0;font-size:12px;align-items:flex-start}
   #diagout .v{text-align:right;font-weight:700}
@@ -772,7 +775,8 @@ function viewSpend() {
         h += `<div class="ent">
             <b class="mono" style="font-size:15px;min-width:74px">${money2(e.amount)}</b>
             <span style="flex:1;min-width:0">
-              <span style="font-size:13px">${esc(e.category || "Uncategorized")}</span>
+              <span style="font-size:13px">${esc(e.category || "Uncategorized")}</span>${
+                e.source === "fuelwise" ? `<span class="src">FuelWise</span>` : ""}
               ${e.note ? `<div class="tiny">${esc(e.note)}</div>` : ""}
             </span>
             <button class="x" data-del="${esc(e._id)}" aria-label="Delete">&times;</button>
