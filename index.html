@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#f0efec" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#141414" media="(prefers-color-scheme: dark)">
 <meta http-equiv="Cache-Control" content="no-cache, must-revalidate">
-<meta name="build" content="11">
+<meta name="build" content="12">
 <!-- Home-screen install: opens standalone (no browser bars), own icon. -->
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -136,7 +136,7 @@
   .dot{position:absolute;transform:translate(14px,-10px);width:6px;height:6px;
     border-radius:50%;background:var(--accent)}
 
-  /* ---- Spend: the display and the keypad ---- */
+  /* ---- Spend ---- */
   .weekbar{display:flex;align-items:center;justify-content:space-between;gap:8px;
     margin:0 0 8px}
   .weekbar button{background:none;border:none;color:var(--ink2);min-width:44px;
@@ -155,45 +155,24 @@
   .verdict .lead{color:var(--ink);font-size:15px;font-weight:500;display:block;
     margin-bottom:2px}
 
-  .display{background:var(--sunk);border:1px solid var(--line);
-    padding:11px 16px;display:flex;align-items:baseline;justify-content:space-between;
-    margin-top:4px}
-  .display .amt{font-size:31px;font-weight:400;letter-spacing:-.02em}
-  .display .amt.zero{color:var(--ink3)}
-  .display .cur{font-size:18px;color:var(--ink2);margin-right:2px}
-  .metarow{display:flex;gap:0;margin-top:-1px;border:1px solid var(--line);
-    border-top:none}
-  .metarow>*{flex:1;background:var(--panel);border:none;border-left:1px solid var(--line);
-    color:var(--ink2);font-size:12px;min-height:38px;padding:0 10px;text-align:center}
-  .metarow>*:first-child{border-left:none}
-  .metarow input{margin:0;border:none;background:var(--panel);font-size:13px;text-align:left}
-  .metarow .on{color:var(--ink);font-weight:600}
+  .amtrow{display:flex;align-items:center;gap:6px;background:var(--sunk);
+    border:1px solid var(--line);padding:2px 14px;margin-top:4px}
+  .amtrow .cur{font-size:20px;color:var(--ink2);font-weight:400}
+  #amt{font-size:32px;font-weight:400;letter-spacing:-.02em;border:none;
+    background:none;padding:10px 0;margin:0;width:100%}
+  #amt:focus{outline:none}
 
-  .catgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;
-    background:var(--line);border:1px solid var(--line);margin-top:10px}
-  .catkey{background:var(--panel);border:none;color:var(--ink);min-height:46px;
-    font-size:13px;font-weight:500;padding:6px 8px;line-height:1.15}
-  .catkey:active{background:var(--accent);color:#fff}
-  .catkey.more{color:var(--ink2)}
-
-  .keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;
-    background:var(--line);border:1px solid var(--line);margin-top:10px}
-  .key{background:var(--key);border:none;color:var(--ink);min-height:50px;
-    font-size:22px;font-weight:400;font-variant-numeric:tabular-nums}
-  .key:active{background:var(--keydn)}
-  .key.fn{font-size:17px;color:var(--ink2)}
-  /* The ET66 had exactly one coloured key, and it was the one that cleared. */
-  .key.del{background:var(--accent);color:#fff}
-  .key.del:active{background:var(--red)}
-
-  .chips{display:flex;flex-wrap:wrap;gap:1px;background:var(--line);
-    border:1px solid var(--line);margin-top:10px}
-  .chip{background:var(--panel);border:none;color:var(--ink);flex:1 0 32%;
-    min-height:48px;font-size:13px;font-weight:500;padding:6px 8px}
-  .chip:active{background:var(--accent);color:#fff}
-  .chip.add{color:var(--accent)}
-  .grouphead{width:100%;background:var(--bg);color:var(--ink3);font-size:10px;
-    font-weight:600;letter-spacing:.14em;padding:8px 10px 4px}
+  /* Chips take the width of their own name. A strict grid is tidier on paper and
+     worse in the hand: equal cells waste half a row on "Gift" and push the rest
+     out of reach. More of them, in less space, wins. */
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+  .chip{background:var(--panel);border:1px solid var(--line2);color:var(--ink);
+    flex:0 0 auto;width:auto;min-height:40px;font-size:13px;font-weight:500;
+    padding:0 13px;line-height:1.2}
+  .chip:active{background:var(--accent);border-color:var(--accent);color:#fff}
+  .chip.add{color:var(--accent);border-style:dashed}
+  .grouphead{width:100%;color:var(--ink3);font-size:10px;font-weight:600;
+    letter-spacing:.14em;padding:8px 0 2px}
 
   details.more>summary{list-style:none;color:var(--ink2);font-size:12px;
     padding:12px 0;cursor:pointer;letter-spacing:.02em}
@@ -780,8 +759,6 @@ let DRAFT = { amt: "", note: "", date: "" };
 let NEWCAT = false;
 let WEEK_OFF = 0;      // 0 = this week, -1 = last week, ...
 let EDIT_ID = null;    // the row being corrected, if any
-let SHOW_NOTE = false; // the note field costs a row, so it stays folded away
-let SHOW_ALL = false;  // the full category list, in place of the six keys
 
 // The starters only matter until he has logged anything; after that his own
 // habits order the chips.
@@ -979,47 +956,21 @@ function viewSpend() {
           is ${money2(budget)} instead of ${money2(BUDGET)}.</div></div>`;
   }
   // ---- the thing he actually opens the app to do ----
-  // Display, then categories, then the keys. Two taps to log: type it, name it.
-  // The keypad is on the page rather than the phone's, because the OS keyboard
-  // shoves the screen around and puts letters under his thumb when he wants digits.
+  // The amount field and the chips, unchanged. An on-page keypad was tried here
+  // and was worse to use in every way; the phone's own keyboard stays.
   h += `<div class="cap">LOG A PAYMENT</div>
-    <div class="display">
-      <span class="amt mono ${DRAFT.amt ? "" : "zero"}" id="disp"><span class="cur">$</span>${
-        esc(DRAFT.amt || "0.00")}</span>
-      <span class="tiny" id="hint"></span>
+    <div class="amtrow"><span class="cur">$</span>
+      <input id="amt" inputmode="decimal" placeholder="0.00" value="${esc(DRAFT.amt)}"></div>
+    <div class="entryrow">
+      <input id="note" placeholder="Note (optional)" value="${esc(DRAFT.note)}">
+      <input class="datepill" type="date" id="dinp" value="${esc(DRAFT.date || defaultDate())}">
     </div>
-    <div class="metarow">
-      <input type="date" id="dinp" value="${esc(DRAFT.date || defaultDate())}">
-      <button id="notetoggle" class="${DRAFT.note ? "on" : ""}">${
-        DRAFT.note ? "note added" : "+ note"}</button>
-    </div>`;
-  if (SHOW_NOTE) {
-    h += `<div class="entryrow"><input id="note" placeholder="What was it for?"
-      value="${esc(DRAFT.note)}"></div>`;
+    <div class="hint" id="hint"></div>
+    <div class="chips">`;
+  for (const c of topCategories(10)) {
+    h += `<button class="chip" data-cat="${esc(c)}">${esc(c)}</button>`;
   }
-
-  if (SHOW_ALL) {
-    const groups = {};
-    for (const c of CATS) {
-      const g = c.group || "Other";
-      (groups[g] = groups[g] || []).push(c.name);
-    }
-    h += `<div class="chips">`;
-    for (const g of Object.keys(groups).sort()) {
-      h += `<div class="grouphead">${esc(g.toUpperCase())}</div>`;
-      for (const name of groups[g].slice().sort()) {
-        h += `<button class="chip" data-cat="${esc(name)}">${esc(name)}</button>`;
-      }
-    }
-    h += `<button class="chip add" id="newcat">+ New category</button>
-      <button class="chip" id="lesscats">Back</button></div>`;
-  } else {
-    h += `<div class="catgrid">`;
-    for (const c of topCategories(5)) {
-      h += `<button class="catkey" data-cat="${esc(c)}">${esc(c)}</button>`;
-    }
-    h += `<button class="catkey more" id="morecats">More</button></div>`;
-  }
+  h += `<button class="chip add" id="newcat">+ New</button></div>`;
   if (NEWCAT) {
     h += `<div class="entryrow">
         <input id="catname" placeholder="New category name" autocomplete="off">
@@ -1027,12 +978,25 @@ function viewSpend() {
       </div>`;
   }
 
-  h += `<div class="keypad">`;
-  for (const k of ["1","2","3","4","5","6","7","8","9",".","0","back"]) {
-    h += `<button class="key ${k === "back" ? "del" : k === "." ? "fn" : ""}"
-      data-key="${k}">${k === "back" ? "&#9003;" : k}</button>`;
+  const groups = {};
+  for (const c of CATS) {
+    const g = c.group || "Other";
+    (groups[g] = groups[g] || []).push(c.name);
   }
-  h += `</div>`;
+  const groupNames = Object.keys(groups).sort();
+  if (groupNames.length) {
+    h += `<details class="more"><summary>All categories</summary><div class="chips">`;
+    for (const g of groupNames) {
+      h += `<div class="grouphead">${esc(g.toUpperCase())}</div>`;
+      for (const name of groups[g].slice().sort()) {
+        h += `<button class="chip" data-cat="${esc(name)}">${esc(name)}</button>`;
+      }
+    }
+    h += `</div></details>`;
+  }
+  h += `<div class="tiny" style="margin-top:10px">Type the amount, tap a category.
+    Tap anything you've logged to fix it. This is your own tally, it doesn't touch
+    your accounts, net worth or the payoff plan.</div>`;
 
   // ---- the log itself ----
   if (week.length) {
@@ -1071,15 +1035,21 @@ function viewSpend() {
       <div class="empty">Nothing logged${thisWeek ? " yet this week" : " that week"}.</div>`;
   }
 
-  h += history();
-
-  // ---- four weeks of habit, which is where a cut actually comes from ----
-  const past = [];
+  // Everything past this point is history, and history was crowding the week he
+  // is actually in. One line, opened only when he wants it.
+  const past4 = [];
   for (let i = 1; i <= 4; i++) {
     const b = weekBounds(WEEK_OFF - i);
     const rows = inWeek(b.wsI, b.weI);
-    if (rows.length) past.push(rows);
+    if (rows.length) past4.push(rows);
   }
+  const hist = history();
+  if (hist || past4.length) {
+    h += `<details class="more"><summary>Earlier weeks</summary>` + hist;
+  }
+
+  // ---- four weeks of habit, which is where a cut actually comes from ----
+  const past = past4;
   if (past.length) {
     const all = past.flat();
     const cats = byCategory(all).slice(0, 6);
@@ -1095,6 +1065,8 @@ function viewSpend() {
         </div>`;
     });
   }
+  if (hist || past4.length) h += `</details>`;
+
   h += `<div class="cap">WEEKLY BUDGET</div>
     <div class="entryrow" style="margin-top:0">
       <input id="bud" inputmode="decimal" placeholder="0" value="${BUDGET || ""}">
@@ -1105,35 +1077,15 @@ function viewSpend() {
   return h;
 }
 
-/// Digits go straight into the draft and only the display is redrawn. Repainting
-/// the whole screen on every key would make the one screen he uses most feel slow.
-function pressKey(k) {
-  let v = DRAFT.amt || "";
-  if (k === "back") {
-    v = v.slice(0, -1);
-  } else if (k === ".") {
-    if (v.includes(".")) return;
-    v = (v || "0") + ".";
-  } else {
-    const dec = v.split(".")[1];
-    if (dec !== undefined && dec.length >= 2) return;
-    if (v.replace(".", "").length >= 7) return;
-    v = (v === "0" ? "" : v) + k;
-  }
-  DRAFT.amt = v;
-  const el = $("disp");
-  if (el) {
-    el.innerHTML = `<span class="cur">$</span>${esc(v || "0.00")}`;
-    el.classList.toggle("zero", !v);
-  }
-  const hint = $("hint");
-  if (hint) hint.textContent = "";
-}
-
 function wireSpend() {
-  for (const b of document.querySelectorAll("[data-key]")) {
-    b.onclick = () => pressKey(b.dataset.key);
+  const amt = $("amt"), note = $("note"), dinp = $("dinp");
+  if (amt) {
+    amt.oninput = () => { DRAFT.amt = amt.value; };
+    amt.addEventListener("keydown", e => { if (e.key === "Enter") amt.blur(); });
   }
+  if (note) note.oninput = () => { DRAFT.note = note.value; };
+  if (dinp) dinp.onchange = () => { DRAFT.date = dinp.value; };
+
   for (const b of document.querySelectorAll("[data-cat]")) {
     b.onclick = () => logSpend(b.dataset.cat);
   }
@@ -1143,17 +1095,6 @@ function wireSpend() {
   for (const b of document.querySelectorAll("[data-week]")) {
     b.onclick = () => goWeek(parseInt(b.dataset.week, 10));
   }
-
-  const dinp = $("dinp");
-  if (dinp) dinp.onchange = () => { DRAFT.date = dinp.value; };
-  const note = $("note");
-  if (note) note.oninput = () => { DRAFT.note = note.value; };
-  const nt = $("notetoggle");
-  if (nt) nt.onclick = () => { SHOW_NOTE = !SHOW_NOTE; paint(); const f = $("note"); if (f) f.focus(); };
-
-  const more = $("morecats"), less = $("lesscats");
-  if (more) more.onclick = () => { SHOW_ALL = true; paint(); };
-  if (less) less.onclick = () => { SHOW_ALL = false; NEWCAT = false; paint(); };
 
   const prev = $("wprev"), next = $("wnext");
   if (prev) prev.onclick = () => goWeek(WEEK_OFF - 1);
@@ -1244,12 +1185,7 @@ function hint(msg) {
   if (el) el.textContent = msg;
 }
 
-/// The amount is typed on our own keypad now, so there is no field to focus.
-function needAmount() {
-  hint("Enter an amount");
-  const d = $("disp");
-  if (d) { d.classList.add("zero"); }
-}
+
 
 // Writes are optimistic: the list updates now and the network catches up. With
 // the persistent cache an offline write is queued, so awaiting it before showing
@@ -1257,7 +1193,8 @@ function needAmount() {
 function logSpend(category) {
   const amount = Math.round(parseFloat(String(DRAFT.amt).replace(/[^0-9.]/g, "")) * 100) / 100;
   if (!(amount > 0)) {
-    needAmount();
+    hint("Enter an amount first.");
+    const a = $("amt"); if (a) a.focus();
     return;
   }
   const rec = {
@@ -1272,7 +1209,7 @@ function logSpend(category) {
   const ref = doc(collection(db, "spend_log"));
   SPEND.push({ ...rec, _id: ref.id });
   DRAFT.amt = ""; DRAFT.note = "";
-  NEWCAT = false; SHOW_NOTE = false; SHOW_ALL = false;
+  NEWCAT = false;
   paint();
   setDoc(ref, rec).catch(e => toast("Couldn't save that: " + (e.message || e)));
   toast("Logged " + money2(amount) + " · " + category, "Undo", () => removeEntry(ref.id));
