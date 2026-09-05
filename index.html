@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#12141a">
 <meta http-equiv="Cache-Control" content="no-cache, must-revalidate">
-<meta name="build" content="9">
+<meta name="build" content="10">
 <!-- Home-screen install: opens standalone (no browser bars), own icon. -->
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -166,6 +166,23 @@
   .src{display:inline-block;border:1px solid var(--border);border-radius:99px;
     padding:1px 7px;font-size:10px;color:var(--muted);margin-left:6px;
     vertical-align:1px}
+  .weekbar{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .weekbar button{background:var(--surface2);border:1px solid var(--border);
+    color:var(--text);border-radius:9px;min-width:40px;min-height:34px;font-size:15px}
+  .weekbar button[disabled]{opacity:.35}
+  .weekbar .lbl{flex:1;text-align:center}
+  .ent.tap{cursor:pointer}
+  .editrow{background:var(--surface2);border:1px solid var(--accent);
+    border-radius:10px;padding:12px;margin:8px 0}
+  .editrow select{width:100%;padding:11px 12px;border-radius:8px;
+    border:1px solid var(--border);background:var(--surface);color:var(--text);
+    font-size:14px;margin-top:8px}
+  .editrow .acts{display:flex;gap:8px;margin-top:10px}
+  .editrow .acts button{flex:1;min-height:42px;border-radius:9px;font-size:13px;
+    font-weight:700;border:1px solid var(--border);background:var(--surface);
+    color:var(--text)}
+  .editrow .acts .save{background:var(--accent);border-color:var(--accent);color:#fff}
+  .editrow .acts .del{color:var(--danger)}
   #diagout .card{text-align:left;margin-top:10px}
   #diagout .row{padding:4px 0;font-size:12px;align-items:flex-start}
   #diagout .v{text-align:right;font-weight:700}
@@ -660,6 +677,8 @@ const sumOf = xs => xs.reduce((t, e) => t + (+e.amount || 0), 0);
 // Kept outside the render so a re-render never eats what he is typing.
 let DRAFT = { amt: "", note: "", date: "" };
 let NEWCAT = false;
+let WEEK_OFF = 0;      // 0 = this week, -1 = last week, ...
+let EDIT_ID = null;    // the row being corrected, if any
 
 // The starters only matter until he has logged anything; after that his own
 // habits order the chips.
@@ -686,32 +705,79 @@ function byCategory(entries) {
     .sort((a, b) => b.amount - a.amount);
 }
 
+function weekBounds(off) {
+  const ws = addDays(weekStartOf(new Date()), off * 7);
+  const we = addDays(ws, 6);
+  return { ws, we, wsI: isoDate(ws), weI: isoDate(we) };
+}
+
+const inWeek = (wsI, weI) => SPEND.filter(e => between(e.date, wsI, weI));
+
+/// Overspend rolls forward. A week that ends over its budget takes the overage
+/// out of the next week, and it keeps taking it until a lean week clears it.
+/// Debt direction only (his call): coming in under does not bank anything, and
+/// nothing is ever forgiven, so the number always matches what he actually spent.
+function carryInto(wsI) {
+  if (!(BUDGET > 0) || !SPEND.length) return 0;
+  const earliest = SPEND.reduce((m, e) => (e.date < m ? e.date : m), SPEND[0].date);
+  let d = weekStartOf(new Date(earliest + "T00:00:00"));
+  let carry = 0;
+  for (let guard = 0; isoDate(d) < wsI && guard < 400; guard++) {
+    const a = isoDate(d), b = isoDate(addDays(d, 6));
+    carry = Math.max(0, sumOf(inWeek(a, b)) - (BUDGET - carry));
+    d = addDays(d, 7);
+  }
+  return Math.round(carry * 100) / 100;
+}
+
+const allCategories = () => {
+  const names = new Set(CATS.map(c => c.name).filter(Boolean));
+  for (const e of SPEND) if (e.category) names.add(e.category);
+  return [...names].sort();
+};
+
 function viewSpend() {
   const today = new Date();
-  const ws = weekStartOf(today), we = addDays(ws, 6);
-  const wsI = isoDate(ws), weI = isoDate(we);
-  const week = SPEND.filter(e => between(e.date, wsI, weI));
+  const { ws, we, wsI, weI } = weekBounds(WEEK_OFF);
+  const week = inWeek(wsI, weI);
   const spent = sumOf(week);
-  const left = BUDGET - spent;
-  const daysLeft = Math.max(0,
-    Math.round((we - new Date(isoDate(today) + "T00:00:00")) / 86400000) + 1);
+  const carry = carryInto(wsI);
+  const budget = BUDGET > 0 ? BUDGET - carry : 0;
+  const left = budget - spent;
+  const thisWeek = WEEK_OFF === 0;
+  const daysLeft = thisWeek
+    ? Math.max(0, Math.round((we - new Date(isoDate(today) + "T00:00:00")) / 86400000) + 1)
+    : 0;
 
-  // ---- the week ----
-  let h = `<div class="cap">${esc(spanLabel(ws, we))}</div>
-    <div class="big ${BUDGET && left < 0 ? "neg" : ""} mono">${money2(spent)}</div>`;
+  // ---- the week, and the arrows to reach the ones behind it ----
+  let h = `<div class="cap weekbar">
+      <button id="wprev" aria-label="Previous week">&#8249;</button>
+      <span class="lbl">${esc(spanLabel(ws, we))}${thisWeek ? "" : ""}</span>
+      <button id="wnext" aria-label="Next week" ${thisWeek ? "disabled" : ""}>&#8250;</button>
+    </div>
+    <div class="big ${BUDGET > 0 && left < 0 ? "neg" : ""} mono">${money2(spent)}</div>`;
+
   if (BUDGET > 0) {
-    const pct = Math.min(100, Math.round(spent / BUDGET * 100));
-    h += `<div class="muted" style="margin-top:4px">of ${money(BUDGET)} &middot;
+    const pct = budget > 0 ? Math.min(100, Math.round(spent / budget * 100)) : 100;
+    h += `<div class="muted" style="margin-top:4px">of ${money(budget)} &middot;
         <b class="${left < 0 ? "neg" : "pos"}">${left < 0 ? money2(-left) + " over"
                                                           : money2(left) + " left"}</b></div>
       <div class="bar"><i style="width:${pct}%;background:${
         left < 0 ? "var(--danger)" : pct > 80 ? "var(--gold)" : "var(--accent)"}"></i></div>`;
-    if (left > 0 && daysLeft > 0) {
+    if (carry > 0) {
+      h += `<div class="card note bad" style="margin-top:10px">
+          <div style="font-size:13px">The week before went over by
+            <b>${money2(carry)}</b>, so this one is <b>${money2(budget)}</b>
+            instead of ${money2(BUDGET)}.</div></div>`;
+    }
+    if (thisWeek && left > 0 && daysLeft > 0) {
       h += `<div class="tiny" style="margin-top:6px">${money2(left / daysLeft)} a day
         for the ${daysLeft} day${daysLeft === 1 ? "" : "s"} left</div>`;
     } else if (left < 0) {
-      h += `<div class="tiny neg" style="margin-top:6px">over budget with
-        ${daysLeft} day${daysLeft === 1 ? "" : "s"} still to go</div>`;
+      h += `<div class="tiny neg" style="margin-top:6px">${thisWeek
+        ? `over by ${money2(-left)} with ${daysLeft} day${daysLeft === 1 ? "" : "s"}
+           still to go. Next week starts at ${money2(BUDGET + left)}.`
+        : `over by ${money2(-left)}, taken out of the week after`}</div>`;
     }
   } else {
     h += `<div class="muted" style="margin-top:4px">no weekly budget set</div>`;
@@ -729,7 +795,7 @@ function viewSpend() {
       <input id="amt" inputmode="decimal" placeholder="0.00" value="${esc(DRAFT.amt)}"></div>
     <div class="entryrow">
       <input id="note" placeholder="Note (optional)" value="${esc(DRAFT.note)}">
-      <input class="datepill" type="date" id="dinp" value="${esc(DRAFT.date || isoDate(today))}">
+      <input class="datepill" type="date" id="dinp" value="${esc(DRAFT.date || defaultDate())}">
     </div>
     <div class="hint" id="hint"></div>
     <div class="chips">`;
@@ -761,25 +827,28 @@ function viewSpend() {
     h += `</div></details>`;
   }
   h += `<div class="tiny" style="margin-top:10px">Type the amount, tap a category.
-    This is your own tally, it doesn't touch your accounts, net worth or the payoff plan.</div>`;
+    Tap anything you've logged to fix it. This is your own tally, it doesn't touch
+    your accounts, net worth or the payoff plan.</div>`;
 
-  // ---- this week's entries ----
+  // ---- the week's entries, each one correctable ----
   if (week.length) {
-    h += `<div class="cap">THIS WEEK &mdash; ${week.length} PAYMENT${week.length === 1 ? "" : "S"}</div>`;
+    h += `<div class="cap">${thisWeek ? "THIS WEEK" : "THAT WEEK"} &mdash;
+      ${week.length} PAYMENT${week.length === 1 ? "" : "S"}</div>`;
     const days = [...new Set(week.map(e => e.date))].sort().reverse();
     for (const d of days) {
       const rows = week.filter(e => e.date === d)
         .sort((a, b) => String(b.created || "").localeCompare(String(a.created || "")));
-      h += `<div class="daysep">${esc(dayLabel(d))} &middot; ${money2(sumOf(rows))}</div><div class="card">`;
+      h += `<div class="daysep">${esc(dayLabel(d))} &middot; ${money2(sumOf(rows))}</div>`;
+      h += `<div class="card">`;
       for (const e of rows) {
-        h += `<div class="ent">
+        h += e._id === EDIT_ID ? editRow(e) : `<div class="ent tap" data-edit="${esc(e._id)}">
             <b class="mono" style="font-size:15px;min-width:74px">${money2(e.amount)}</b>
             <span style="flex:1;min-width:0">
               <span style="font-size:13px">${esc(e.category || "Uncategorized")}</span>${
                 e.source === "fuelwise" ? `<span class="src">FuelWise</span>` : ""}
               ${e.note ? `<div class="tiny">${esc(e.note)}</div>` : ""}
             </span>
-            <button class="x" data-del="${esc(e._id)}" aria-label="Delete">&times;</button>
+            <span class="x" aria-hidden="true">&rsaquo;</span>
           </div>`;
       }
       h += `</div>`;
@@ -787,7 +856,7 @@ function viewSpend() {
 
     const cats = byCategory(week);
     const peak = cats[0].amount || 1;
-    h += `<div class="cap">WHERE IT WENT THIS WEEK</div><div class="card">`;
+    h += `<div class="cap">WHERE IT WENT</div><div class="card">`;
     for (const c of cats) {
       h += `<div style="margin-bottom:10px">
           <div class="row"><span style="font-size:13px">${esc(c.category)}</span>
@@ -797,15 +866,16 @@ function viewSpend() {
     }
     h += `</div>`;
   } else {
-    h += `<div class="cap">THIS WEEK</div>
-      <div class="empty"><span class="em">&#129534;</span>Nothing logged yet this week.</div>`;
+    h += `<div class="cap">${thisWeek ? "THIS WEEK" : "THAT WEEK"}</div>
+      <div class="empty"><span class="em">&#129534;</span>Nothing logged${
+        thisWeek ? " yet this week" : " that week"}.</div>`;
   }
 
   // ---- the four weeks behind it: what to cut ----
   const weeks = [];
   for (let i = 1; i <= 4; i++) {
     const a = addDays(ws, -7 * i), b = addDays(a, 6);
-    weeks.push({ a, b, entries: SPEND.filter(e => between(e.date, isoDate(a), isoDate(b))) });
+    weeks.push({ off: WEEK_OFF - i, a, b, entries: inWeek(isoDate(a), isoDate(b)) });
   }
   const past = weeks.filter(w => w.entries.length);
   if (past.length) {
@@ -813,12 +883,14 @@ function viewSpend() {
     h += `<div class="cap">THE FOUR WEEKS BEFORE</div><div class="card">`;
     for (const w of past) {
       const tot = sumOf(w.entries);
-      const over = BUDGET > 0 ? tot - BUDGET : 0;
-      h += `<div class="row" style="padding:5px 0">
+      const bud = BUDGET > 0 ? BUDGET - carryInto(isoDate(w.a)) : 0;
+      const over = bud > 0 ? tot - bud : 0;
+      h += `<div class="row ent tap" data-week="${w.off}" style="padding:7px 0">
           <span class="muted" style="font-size:12px">${esc(spanLabel(w.a, w.b))}</span>
           <span><b class="mono" style="font-size:13px">${money2(tot)}</b>
-            ${BUDGET > 0 ? `<span class="tiny ${over > 0 ? "neg" : "pos"}">
-              ${over > 0 ? " +" + money(over) + " over" : " " + money(-over) + " under"}</span>` : ""}</span>
+            ${bud > 0 ? `<span class="tiny ${over > 0 ? "neg" : "pos"}">
+              ${over > 0 ? " +" + money(over) + " over" : " " + money(-over) + " under"}</span>` : ""}
+            <span class="x" aria-hidden="true">&rsaquo;</span></span>
         </div>`;
     }
     h += `<div class="row" style="border-top:1px solid var(--border);margin-top:6px;padding-top:8px">
@@ -843,6 +915,39 @@ function viewSpend() {
   return h;
 }
 
+/// A logged payment opened for correction. Everything about it is editable,
+/// because the whole point is that he mistyped something.
+function editRow(e) {
+  const opts = allCategories().map(n =>
+    `<option value="${esc(n)}"${n === e.category ? " selected" : ""}>${esc(n)}</option>`).join("");
+  return `<div class="editrow">
+      <div class="entryrow" style="margin-top:0">
+        <input id="eamt" inputmode="decimal" value="${e.amount}">
+        <input class="datepill" type="date" id="edate" value="${esc(e.date)}">
+      </div>
+      <div class="entryrow">
+        <input id="enote" placeholder="Note (optional)" value="${esc(e.note || "")}">
+      </div>
+      <select id="ecat">${opts}</select>
+      <div class="acts">
+        <button class="save" id="esave">Save</button>
+        <button id="ecancel">Cancel</button>
+        <button class="del" id="edel">Delete</button>
+      </div>
+      ${e.source === "fuelwise" ? `<div class="tiny" style="margin-top:8px">This came
+        from FuelWise. Editing the fill-up there will overwrite this.</div>` : ""}
+    </div>`;
+}
+
+/// The date a new payment defaults to: today when he is looking at this week,
+/// otherwise the end of the week he is looking at, so logging into a past week
+/// does not file the payment somewhere he cannot see it.
+function defaultDate() {
+  const { we, wsI, weI } = weekBounds(WEEK_OFF);
+  const today = isoDate(new Date());
+  return between(today, wsI, weI) ? today : isoDate(we);
+}
+
 function wireSpend() {
   const amt = $("amt"), note = $("note"), dinp = $("dinp");
   if (amt) amt.oninput = () => { DRAFT.amt = amt.value; };
@@ -853,9 +958,21 @@ function wireSpend() {
   for (const b of document.querySelectorAll("[data-cat]")) {
     b.onclick = () => logSpend(b.dataset.cat);
   }
-  for (const b of document.querySelectorAll("[data-del]")) {
-    b.onclick = () => removeEntry(b.dataset.del);
+  for (const b of document.querySelectorAll("[data-edit]")) {
+    b.onclick = () => { EDIT_ID = b.dataset.edit; paint(); };
   }
+  for (const b of document.querySelectorAll("[data-week]")) {
+    b.onclick = () => goWeek(parseInt(b.dataset.week, 10));
+  }
+
+  const prev = $("wprev"), next = $("wnext");
+  if (prev) prev.onclick = () => goWeek(WEEK_OFF - 1);
+  if (next) next.onclick = () => goWeek(WEEK_OFF + 1);
+
+  const save = $("esave"), cancel = $("ecancel"), del = $("edel");
+  if (save) save.onclick = () => saveEdit();
+  if (cancel) cancel.onclick = () => { EDIT_ID = null; paint(); };
+  if (del) del.onclick = () => { const id = EDIT_ID; EDIT_ID = null; removeEntry(id); };
 
   const nc = $("newcat");
   if (nc) nc.onclick = () => { NEWCAT = !NEWCAT; paint(); const f = $("catname"); if (f) f.focus(); };
@@ -866,6 +983,39 @@ function wireSpend() {
   const bs = $("budsave"), bud = $("bud");
   if (bs) bs.onclick = () => saveBudget(bud ? bud.value : "");
   if (bud) bud.addEventListener("keydown", e => { if (e.key === "Enter") saveBudget(bud.value); });
+}
+
+function goWeek(off) {
+  if (off > 0) return;                  // there is nothing to see in the future
+  WEEK_OFF = off;
+  EDIT_ID = null;
+  DRAFT.date = "";                      // let the new week pick the default
+  paint();
+  window.scrollTo({ top: 0, behavior: "instant" });
+}
+
+/// Save a correction. The whole row is rewritten, keeping `created` and `source`
+/// so a FuelWise charge stays recognisable as one.
+function saveEdit() {
+  const id = EDIT_ID;
+  const e = SPEND.find(x => x._id === id);
+  if (!e) { EDIT_ID = null; paint(); return; }
+  const amount = Math.round(parseFloat(String($("eamt").value).replace(/[^0-9.]/g, "")) * 100) / 100;
+  if (!(amount > 0)) { $("eamt").focus(); return; }
+  const rec = {
+    date: $("edate").value || e.date,
+    amount,
+    category: $("ecat").value || e.category,
+    note: $("enote").value.trim(),
+    created: e.created || new Date().toISOString(),
+  };
+  if (e.source) rec.source = e.source;
+  Object.assign(e, rec);
+  EDIT_ID = null;
+  paint();
+  setDoc(doc(db, "spend_log", id), rec)
+    .catch(err => toast("Couldn't save that change: " + (err.message || err)));
+  toast("Updated " + money2(amount) + " \u00b7 " + rec.category);
 }
 
 function hint(msg) {
@@ -884,7 +1034,9 @@ function logSpend(category) {
     return;
   }
   const rec = {
-    date: DRAFT.date || isoDate(new Date()),
+    // defaultDate(), not today: logging while looking at a past week has to land
+    // in the week he is looking at, or it vanishes from the screen he typed it on.
+    date: DRAFT.date || defaultDate(),
     amount: amount,
     category: category,
     note: (DRAFT.note || "").trim(),
