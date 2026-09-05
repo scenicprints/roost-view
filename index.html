@@ -3,9 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#12141a">
+<meta name="theme-color" content="#f0efec" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#141414" media="(prefers-color-scheme: dark)">
 <meta http-equiv="Cache-Control" content="no-cache, must-revalidate">
-<meta name="build" content="10">
+<meta name="build" content="11">
 <!-- Home-screen install: opens standalone (no browser bars), own icon. -->
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -16,177 +17,269 @@
 <title>Roost</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🪺</text></svg>">
 <style>
+  /* ---------------------------------------------------------------------------
+     Braun, by way of Rams. One ground, one accent, hairlines instead of boxes,
+     and nothing on the screen that isn't carrying information. The money is the
+     only thing allowed to be loud: everything else is set in greys so the eye
+     goes to the number first. Light by default, neutral graphite after dark,
+     because a paper-white money app at 11pm is a design that stopped thinking
+     about the person holding it.
+  --------------------------------------------------------------------------- */
   :root{
-    --bg:#12141a; --surface:#1b1e27; --surface2:#232733; --border:#2c3140;
-    --text:#e7e9ee; --muted:#8b90a0; --accent:#4a9d6a; --accent-hi:#5cb87e;
-    --danger:#d16a6a; --gold:#c9a55a; --gold-hi:#dcbb6e; --blue:#648cff;
-    --tabbar:78px;                       /* height of the bottom nav */
+    --bg:#f0efec; --panel:#f7f7f5; --sunk:#e7e5e1;
+    --line:#d7d5d0; --line2:#c4c1bb;
+    --ink:#16161a; --ink2:#6d6c68; --ink3:#9b9995;
+    /* Braun's colours, used the way Braun used them: never as decoration, only
+       to say something. Yellow marks the reference, green means you are fine,
+       orange means act, red is reserved for the one key that destroys work. */
+    --accent:#e0561d;            /* orange: attention, over budget */
+    --warn:#e8a300;              /* yellow: the reference mark, spending fast */
+    --good:#2f7d4f;              /* green: on track, under */
+    --info:#26588f;              /* blue: a fourth series, nothing more */
+    --red:#c02f22;
+    --key:#e8e6e2; --keydn:#dbd8d3;
+    --tabbar:70px;
   }
-  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-  body{margin:0;background:var(--bg);color:var(--text);
-    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
-    padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
-    overscroll-behavior-y:contain;}
-  .wrap{max-width:560px;margin:0 auto;padding:18px 16px 48px}
-  .cap{color:var(--muted);font-size:10px;font-weight:700;letter-spacing:2px;margin:22px 0 8px}
-  .cap:first-child{margin-top:0}
-  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;
-    padding:14px 16px;margin-bottom:10px}
-  .row{display:flex;align-items:center;justify-content:space-between;gap:10px}
-  .muted{color:var(--muted);font-size:12px}
-  .tiny{color:var(--muted);font-size:11px}
-  .big{font-size:38px;font-weight:300;letter-spacing:-1px;line-height:1.1}
-  .mono{font-variant-numeric:tabular-nums;font-feature-settings:"tnum"}
-  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-  .val{font-size:20px;font-weight:700}
-  .pos{color:var(--accent-hi)} .neg{color:var(--danger)}
-  .gold{color:var(--gold-hi)} .blue{color:var(--blue)}
-  .bar{height:8px;background:var(--border);border-radius:4px;overflow:hidden;margin-top:8px}
-  .bar>i{display:block;height:100%;border-radius:4px;background:var(--gold)}
-  .grade{font-size:46px;font-weight:800;line-height:1}
-  .pill{display:inline-block;padding:2px 8px;border-radius:99px;font-size:11px;
-    border:1px solid var(--border);color:var(--muted)}
-  .note{border-left:3px solid var(--gold);padding-left:12px}
-  .note.bad{border-color:var(--danger)} .note.good{border-color:var(--accent)}
-  button{font:inherit}
-  .btn{width:100%;padding:13px;border-radius:10px;border:none;background:var(--accent);
-    color:#fff;font-weight:700;font-size:15px}
-  input{width:100%;padding:12px;border-radius:8px;border:1px solid var(--border);
-    background:var(--surface2);color:var(--text);font-size:16px;margin-bottom:10px}
-  /* NOTE: never hide #login here. It is the fail-safe default view — if the
-     script dies, the user must still see something. Visibility is toggled with
-     explicit inline display values only. */
-  #login{padding-top:12vh}
-  .brand{font-size:26px;font-weight:700;margin-bottom:2px}
-  .err{color:var(--danger);font-size:13px;min-height:18px}
-  .foot{color:var(--muted);font-size:11px;text-align:center;margin-top:26px}
-  a{color:var(--muted)}
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#151515; --panel:#1d1d1d; --sunk:#101010;
+      --line:#2c2c2c; --line2:#3a3a3a;
+      --ink:#eeece8; --ink2:#9c9a96; --ink3:#6f6d69;
+      --accent:#f26a22;
+      --warn:#f0b52a;
+      --good:#5aa877;
+      --info:#5b8fc9;
+      --red:#e0513f;
+      --key:#242424; --keydn:#2f2f2f;
+    }
+  }
 
-  /* ---- app chrome: sticky header + bottom tab bar --------------------- */
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Roboto,Helvetica,Arial,sans-serif;
+    font-size:15px;line-height:1.45;
+    padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+    overscroll-behavior-y:contain;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:520px;margin:0 auto;padding:14px 20px 40px}
+  .mono{font-variant-numeric:tabular-nums;font-feature-settings:"tnum";
+    letter-spacing:-.01em}
+
+  /* labels: the only uppercase in the app, and only for naming a block */
+  .cap{color:var(--ink3);font-size:10px;font-weight:600;letter-spacing:.14em;
+    text-transform:uppercase;margin:18px 0 7px}
+  .cap:first-child{margin-top:0}
+
+  /* a "card" is a ruled band, not a floating box */
+  .card{background:none;border:none;border-top:1px solid var(--line);
+    padding:12px 0;margin:0}
+  .card + .card{border-top:1px solid var(--line)}
+  .row{display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .muted{color:var(--ink2);font-size:13px}
+  .tiny{color:var(--ink3);font-size:12px}
+  .big{font-size:40px;font-weight:400;letter-spacing:-.03em;line-height:1.05}
+  .val{font-size:19px;font-weight:600}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 20px}
+  .pos{color:var(--good)} .neg{color:var(--accent)}
+  .gold{color:var(--accent)} .blue{color:var(--ink)}
+  .grade{font-size:42px;font-weight:500;line-height:1}
+  .pill{display:inline-block;padding:1px 7px;font-size:11px;
+    border:1px solid var(--line2);color:var(--ink2)}
+
+  /* progress: a rule that fills, never a rounded pill */
+  .bar{height:3px;background:var(--line);margin-top:10px;position:relative}
+  .bar>i{display:block;height:100%;background:var(--ink)}
+  .bar.s0>i{background:var(--warn)}    .bar.s1>i{background:var(--accent)}
+  .bar.s2>i{background:var(--good)}    .bar.s3>i{background:var(--info)}
+  .bar.s4>i{background:var(--red)}     .bar.s5>i{background:var(--ink2)}
+  .bar.tall{height:5px}
+  .bar>u{position:absolute;top:-3px;width:1px;height:9px;background:var(--ink2)}
+
+  .note{border-left:2px solid var(--ink2);padding:2px 0 2px 12px}
+  .note.bad{border-color:var(--accent)} .note.good{border-color:var(--good)}
+
+  button{font:inherit;color:inherit}
+  .btn{width:100%;padding:15px;border:none;background:var(--ink);color:var(--bg);
+    font-weight:600;font-size:15px;letter-spacing:.02em}
+  input,select{width:100%;padding:12px;border:1px solid var(--line2);
+    background:var(--panel);color:var(--ink);font-size:16px;margin-bottom:10px;
+    border-radius:0;-webkit-appearance:none;appearance:none}
+  input:focus,select:focus{outline:none;border-color:var(--ink)}
+
+  #login{padding-top:14vh}
+  .brand{font-size:22px;font-weight:600;letter-spacing:-.01em;margin-bottom:2px}
+  .err{color:var(--accent);font-size:13px;min-height:18px}
+  .foot{color:var(--ink3);font-size:11px;text-align:center;margin-top:32px}
+  a{color:var(--ink2)}
+
+  /* ---- chrome ---- */
   #app{padding-bottom:calc(var(--tabbar) + env(safe-area-inset-bottom))}
-  .topbar{position:sticky;top:0;z-index:20;background:rgba(18,20,26,.92);
-    backdrop-filter:blur(10px);border-bottom:1px solid var(--border)}
-  .topbar-in{max-width:560px;margin:0 auto;padding:12px 16px;
+  .topbar{position:sticky;top:0;z-index:20;background:var(--bg);
+    border-bottom:1px solid var(--line)}
+  .topbar-in{max-width:520px;margin:0 auto;padding:12px 20px;
     display:flex;align-items:center;justify-content:space-between;gap:12px}
-  .title{font-size:19px;font-weight:700}
-  .refresh{background:var(--surface2);border:1px solid var(--border);color:var(--muted);
-    border-radius:10px;min-width:44px;min-height:36px;padding:0 12px;font-size:12px}
-  .refresh:active{background:var(--border)}
+  .title{font-size:15px;font-weight:600;letter-spacing:.01em}
+  .refresh{background:none;border:none;color:var(--ink3);font-size:12px;
+    min-height:36px;padding:0 2px;letter-spacing:.06em;text-transform:uppercase}
   .spin{animation:sp .8s linear infinite;display:inline-block}
   @keyframes sp{to{transform:rotate(360deg)}}
 
-  .tabbar{position:fixed;left:0;right:0;bottom:0;z-index:30;
-    background:rgba(18,20,26,.96);backdrop-filter:blur(12px);
-    border-top:1px solid var(--border);
-    padding-bottom:env(safe-area-inset-bottom)}
-  .tabbar-in{max-width:560px;margin:0 auto;display:grid;grid-template-columns:repeat(5,1fr)}
-  .tab{background:none;border:none;color:var(--muted);
-    min-height:58px;padding:9px 2px 7px;display:flex;flex-direction:column;
-    align-items:center;justify-content:center;gap:4px;font-size:11px;font-weight:600}
-  .tab svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.9;
+  .tabbar{position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--bg);
+    border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
+  .tabbar-in{max-width:520px;margin:0 auto;display:grid;grid-template-columns:repeat(5,1fr)}
+  .tab{background:none;border:none;color:var(--ink3);min-height:var(--tabbar);
+    padding:10px 2px;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;gap:5px;font-size:10px;font-weight:600;
+    letter-spacing:.08em;text-transform:uppercase}
+  .tab svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.6;
     stroke-linecap:round;stroke-linejoin:round}
-  .tab[aria-selected="true"]{color:var(--accent-hi)}
-  .tab:active{background:var(--surface2)}
-  .dot{position:absolute;transform:translate(15px,-11px);width:7px;height:7px;
-    border-radius:50%;background:var(--gold-hi)}
+  .tab[aria-selected="true"]{color:var(--ink)}
+  .dot{position:absolute;transform:translate(14px,-10px);width:6px;height:6px;
+    border-radius:50%;background:var(--accent)}
 
-  /* ---- Ada's Debt ------------------------------------------------------ */
-  .acct{background:var(--surface);border:1px solid var(--border);border-radius:12px;
-    padding:12px 14px;margin-bottom:12px}
-  .acct-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;
-    padding-bottom:8px;border-bottom:1px solid var(--border);margin-bottom:4px}
-  .acct-name{font-size:16px;font-weight:700}
-  details.cardrow{border-radius:9px;margin-top:8px;background:var(--surface2)}
-  details.cardrow>summary{list-style:none;cursor:pointer;padding:11px 12px;
-    display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:46px}
-  details.cardrow>summary::-webkit-details-marker{display:none}
-  .chev{transition:transform .15s;color:var(--muted);flex:none}
-  details[open]>summary .chev{transform:rotate(90deg)}
-  .lines{padding:2px 12px 10px}
-  .line{display:flex;align-items:center;gap:10px;padding:6px 0;
-    border-top:1px solid var(--border);font-size:12px}
-  .line .d{color:var(--muted);font-size:11px;min-width:42px}
-  .line .n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .empty{text-align:center;color:var(--muted);padding:40px 16px;font-size:13px}
-  .empty .em{font-size:34px;display:block;margin-bottom:10px;opacity:.65}
+  /* ---- Spend: the display and the keypad ---- */
+  .weekbar{display:flex;align-items:center;justify-content:space-between;gap:8px;
+    margin:0 0 8px}
+  .weekbar button{background:none;border:none;color:var(--ink2);min-width:44px;
+    min-height:36px;font-size:20px;line-height:1}
+  .weekbar button[disabled]{opacity:.25}
+  .weekbar .lbl{flex:1;text-align:center;color:var(--ink3);font-size:10px;
+    font-weight:600;letter-spacing:.14em;text-transform:uppercase}
 
-  /* ---- install prompt -------------------------------------------------- */
-  /* Shown only when Chrome says the page is installable, which it only does
-     when it is NOT already installed. A home-screen icon made with "Add
-     shortcut" instead of "Install" opens in a browser tab, and this is the one
-     tap that fixes it. */
-  #installbar{max-width:560px;margin:12px auto 0;padding:0 16px}
-  #installbar .card{display:flex;align-items:center;gap:12px;border-color:var(--accent);
-    margin-bottom:0}
-  #installbar .go{background:var(--accent);color:#fff;border:none;border-radius:9px;
-    padding:9px 14px;font-weight:700;font-size:13px;flex:none}
-  #installbar .no{background:none;border:none;color:var(--muted);font-size:18px;
-    padding:2px 4px;flex:none}
+  /* A solid square of the state colour, the way a Braun dial marks its setting. */
+  .mark{display:inline-block;width:11px;height:11px;margin-right:9px;
+    vertical-align:-1px;background:var(--ink3)}
+  .mark.good{background:var(--good)} .mark.warn{background:var(--warn)}
+  .mark.bad{background:var(--accent)}
+  .verdict{margin-top:10px;font-size:13px;color:var(--ink2)}
+  .verdict b{color:var(--ink);font-weight:600}
+  .verdict .lead{color:var(--ink);font-size:15px;font-weight:500;display:block;
+    margin-bottom:2px}
 
-  /* ---- spend log ------------------------------------------------------- */
-  .amtrow{display:flex;align-items:center;gap:6px;background:var(--surface2);
-    border:1px solid var(--border);border-radius:12px;padding:2px 14px}
-  .amtrow .cur{font-size:24px;color:var(--muted);font-weight:300}
-  #amt{font-size:32px;font-weight:600;border:none;background:none;padding:12px 0;
-    margin:0;letter-spacing:-.5px}
-  #amt:focus{outline:none}
+  .display{background:var(--sunk);border:1px solid var(--line);
+    padding:11px 16px;display:flex;align-items:baseline;justify-content:space-between;
+    margin-top:4px}
+  .display .amt{font-size:31px;font-weight:400;letter-spacing:-.02em}
+  .display .amt.zero{color:var(--ink3)}
+  .display .cur{font-size:18px;color:var(--ink2);margin-right:2px}
+  .metarow{display:flex;gap:0;margin-top:-1px;border:1px solid var(--line);
+    border-top:none}
+  .metarow>*{flex:1;background:var(--panel);border:none;border-left:1px solid var(--line);
+    color:var(--ink2);font-size:12px;min-height:38px;padding:0 10px;text-align:center}
+  .metarow>*:first-child{border-left:none}
+  .metarow input{margin:0;border:none;background:var(--panel);font-size:13px;text-align:left}
+  .metarow .on{color:var(--ink);font-weight:600}
+
+  .catgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;
+    background:var(--line);border:1px solid var(--line);margin-top:10px}
+  .catkey{background:var(--panel);border:none;color:var(--ink);min-height:46px;
+    font-size:13px;font-weight:500;padding:6px 8px;line-height:1.15}
+  .catkey:active{background:var(--accent);color:#fff}
+  .catkey.more{color:var(--ink2)}
+
+  .keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;
+    background:var(--line);border:1px solid var(--line);margin-top:10px}
+  .key{background:var(--key);border:none;color:var(--ink);min-height:50px;
+    font-size:22px;font-weight:400;font-variant-numeric:tabular-nums}
+  .key:active{background:var(--keydn)}
+  .key.fn{font-size:17px;color:var(--ink2)}
+  /* The ET66 had exactly one coloured key, and it was the one that cleared. */
+  .key.del{background:var(--accent);color:#fff}
+  .key.del:active{background:var(--red)}
+
+  .chips{display:flex;flex-wrap:wrap;gap:1px;background:var(--line);
+    border:1px solid var(--line);margin-top:10px}
+  .chip{background:var(--panel);border:none;color:var(--ink);flex:1 0 32%;
+    min-height:48px;font-size:13px;font-weight:500;padding:6px 8px}
+  .chip:active{background:var(--accent);color:#fff}
+  .chip.add{color:var(--accent)}
+  .grouphead{width:100%;background:var(--bg);color:var(--ink3);font-size:10px;
+    font-weight:600;letter-spacing:.14em;padding:8px 10px 4px}
+
+  details.more>summary{list-style:none;color:var(--ink2);font-size:12px;
+    padding:12px 0;cursor:pointer;letter-spacing:.02em}
+  details.more>summary::-webkit-details-marker{display:none}
+
   .entryrow{display:flex;gap:8px;margin-top:8px}
-  /* The base rule gives every input width:100%; inside a flex row that has to be
-     undone or the text field collapses to nothing beside the date picker. */
   .entryrow>input{margin:0;font-size:14px;padding:11px 12px;flex:1 1 auto;
     width:auto;min-width:0}
   .entryrow>input.datepill,.entryrow>button{flex:0 0 auto;width:auto}
-  .datepill{background:var(--surface2);border:1px solid var(--border);color:var(--text);
-    border-radius:8px;padding:0 12px;min-height:44px;font-size:13px;white-space:nowrap;flex:none}
-  .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
-  .chip{background:var(--surface2);border:1px solid var(--border);color:var(--text);
-    border-radius:99px;padding:0 15px;min-height:44px;font-size:14px;font-weight:600}
-  .chip:active{background:var(--accent);border-color:var(--accent);color:#fff}
-  .chip.add{color:var(--accent-hi);border-style:dashed}
-  .grouphead{color:var(--muted);font-size:10px;font-weight:700;letter-spacing:1.6px;
-    width:100%;margin:10px 0 -2px}
-  details.more>summary{list-style:none;color:var(--muted);font-size:12px;padding:12px 2px;
-    cursor:pointer}
-  details.more>summary::-webkit-details-marker{display:none}
-  .ent{display:flex;align-items:center;gap:10px;padding:10px 0;
-    border-top:1px solid var(--border)}
-  .ent:first-child{border-top:none}
-  .ent .x{background:none;border:none;color:var(--muted);font-size:16px;
-    padding:6px 2px 6px 8px;line-height:1;flex:none}
-  .daysep{color:var(--muted);font-size:11px;font-weight:700;letter-spacing:1.4px;
-    margin:14px 0 4px}
-  .toast{position:fixed;left:50%;transform:translateX(-50%);
-    bottom:calc(var(--tabbar) + env(safe-area-inset-bottom) + 14px);z-index:40;
-    background:var(--surface2);border:1px solid var(--border);border-radius:12px;
-    padding:12px 14px;display:flex;align-items:center;gap:16px;font-size:13px;
-    box-shadow:0 10px 28px rgba(0,0,0,.5);max-width:92vw}
-  .toast button{background:none;border:none;color:var(--gold-hi);font-weight:700;
-    font-size:13px;padding:2px}
-  .hint{color:var(--danger);font-size:12px;min-height:16px;margin-top:6px}
-  .src{display:inline-block;border:1px solid var(--border);border-radius:99px;
-    padding:1px 7px;font-size:10px;color:var(--muted);margin-left:6px;
-    vertical-align:1px}
-  .weekbar{display:flex;align-items:center;justify-content:space-between;gap:8px}
-  .weekbar button{background:var(--surface2);border:1px solid var(--border);
-    color:var(--text);border-radius:9px;min-width:40px;min-height:34px;font-size:15px}
-  .weekbar button[disabled]{opacity:.35}
-  .weekbar .lbl{flex:1;text-align:center}
+  .datepill{background:var(--panel);border:1px solid var(--line2);color:var(--ink);
+    padding:0 12px;min-height:44px;font-size:13px;white-space:nowrap}
+
+  /* ---- the log ---- */
+  .daysep{color:var(--ink3);font-size:10px;font-weight:600;letter-spacing:.14em;
+    text-transform:uppercase;margin:20px 0 0;padding-bottom:6px;
+    border-bottom:1px solid var(--line)}
+  .ent{display:flex;align-items:center;gap:12px;padding:12px 0;
+    border-bottom:1px solid var(--line)}
   .ent.tap{cursor:pointer}
-  .editrow{background:var(--surface2);border:1px solid var(--accent);
-    border-radius:10px;padding:12px;margin:8px 0}
-  .editrow select{width:100%;padding:11px 12px;border-radius:8px;
-    border:1px solid var(--border);background:var(--surface);color:var(--text);
-    font-size:14px;margin-top:8px}
-  .editrow .acts{display:flex;gap:8px;margin-top:10px}
-  .editrow .acts button{flex:1;min-height:42px;border-radius:9px;font-size:13px;
-    font-weight:700;border:1px solid var(--border);background:var(--surface);
-    color:var(--text)}
-  .editrow .acts .save{background:var(--accent);border-color:var(--accent);color:#fff}
-  .editrow .acts .del{color:var(--danger)}
-  #diagout .card{text-align:left;margin-top:10px}
-  #diagout .row{padding:4px 0;font-size:12px;align-items:flex-start}
-  #diagout .v{text-align:right;font-weight:700}
-  #diagout .v.y{color:var(--accent-hi)} #diagout .v.n{color:var(--danger)}
+  .ent .x{background:none;border:none;color:var(--ink3);font-size:15px;
+    padding:6px 0 6px 8px;line-height:1;flex:none}
+  .src{display:inline-block;border:1px solid var(--info);padding:0 6px;
+    font-size:10px;color:var(--info);margin-left:7px;vertical-align:1px;
+    letter-spacing:.04em}
+
+  .editrow{background:var(--panel);border:1px solid var(--ink);padding:14px;
+    margin:10px 0}
+  .editrow select{margin-top:8px;margin-bottom:0}
+  .editrow .acts{display:flex;gap:1px;margin-top:12px;background:var(--line2);
+    border:1px solid var(--line2)}
+  .editrow .acts button{flex:1;min-height:44px;font-size:13px;font-weight:600;
+    border:none;background:var(--panel);color:var(--ink)}
+  .editrow .acts .save{background:var(--ink);color:var(--bg)}
+  .editrow .acts .del{color:var(--accent)}
+
+  /* ---- eight weeks, drawn honestly ---- */
+  .hist{display:flex;align-items:flex-end;gap:5px;height:96px;position:relative;
+    margin-top:18px;padding-bottom:18px;border-bottom:1px solid var(--line)}
+  .hist .budgetline{position:absolute;left:0;right:0;border-top:1px dashed var(--warn)}
+  .histcol{flex:1;display:flex;flex-direction:column;justify-content:flex-end;
+    height:100%;background:none;border:none;padding:0;position:relative}
+  .histcol i{display:block;background:var(--good);width:100%}
+  .histcol i.over{background:var(--accent)}
+  .histcol i.now{background:var(--ink)}
+  .histcol i.now.over{background:var(--accent)}
+  .histcol span{position:absolute;bottom:-17px;left:0;right:0;text-align:center;
+    font-size:9px;color:var(--ink3);letter-spacing:.04em}
+
+  /* ---- misc ---- */
+  .empty{text-align:center;color:var(--ink3);padding:36px 16px;font-size:13px}
+  .empty .em{font-size:28px;display:block;margin-bottom:10px;opacity:.5}
+  .acct{border-top:1px solid var(--line);padding:12px 0;margin:0}
+  .acct-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;
+    padding-bottom:6px}
+  .acct-name{font-size:15px;font-weight:600}
+  details.cardrow{margin-top:6px;border-top:1px solid var(--line)}
+  details.cardrow>summary{list-style:none;cursor:pointer;padding:10px 0;
+    display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:44px}
+  details.cardrow>summary::-webkit-details-marker{display:none}
+  .chev{transition:transform .15s;color:var(--ink3);flex:none}
+  details[open]>summary .chev{transform:rotate(90deg)}
+  .lines{padding:0 0 8px}
+  .line{display:flex;align-items:center;gap:10px;padding:7px 0;
+    border-top:1px solid var(--line);font-size:12px}
+  .line .d{color:var(--ink3);font-size:11px;min-width:42px}
+  .line .n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+  #installbar{max-width:520px;margin:12px auto 0;padding:0 20px}
+  #installbar .card{display:flex;align-items:center;gap:12px;border-top:none;
+    border-left:2px solid var(--accent);padding:10px 0 10px 12px}
+  #installbar .go{background:var(--ink);color:var(--bg);border:none;
+    padding:10px 14px;font-weight:600;font-size:13px;flex:none}
+  #installbar .no{background:none;border:none;color:var(--ink3);font-size:18px;
+    padding:2px 4px;flex:none}
+  #diagout .card{text-align:left}
+  #diagout .row{padding:5px 0;font-size:12px;align-items:flex-start}
+  #diagout .v{text-align:right;font-weight:600;color:var(--ink)}
+  #diagout .v.n{color:var(--accent)}
+
+  .toast{position:fixed;left:20px;right:20px;max-width:480px;margin:0 auto;
+    bottom:calc(var(--tabbar) + env(safe-area-inset-bottom) + 12px);z-index:40;
+    background:var(--ink);color:var(--bg);border:none;padding:13px 16px;
+    display:flex;align-items:center;gap:16px;font-size:13px}
+  .toast button{background:none;border:none;color:var(--bg);font-weight:700;
+    font-size:13px;padding:2px;text-decoration:underline}
+  .hint{color:var(--accent);font-size:12px;min-height:16px;margin-top:8px}
 </style>
 </head>
 <body>
@@ -347,15 +440,23 @@ const ICON = {
   spend: '<circle cx="12" cy="12" r="9"/><path d="M12 7.5v9"/><path d="M9.5 15h4a1.75 1.75 0 0 0 0-3.5h-3a1.75 1.75 0 0 1 0-3.5h4"/>',
 };
 const TABS = [
+  {key:"spend",    label:"Spend",    title:"Spend"},
   {key:"home",     label:"Home",     title:"Home"},
-  {key:"spend",    label:"Spend",    title:"This Week"},
   {key:"accounts", label:"Accounts", title:"Accounts"},
   {key:"ada",      label:"Ada",      title:"Ada's Debt"},
   {key:"plan",     label:"Plan",     title:"Plan & Spending"},
 ];
-let TAB = "home";
-try { TAB = localStorage.getItem("roostTab") || "home"; } catch (e) {}
-if (!TABS.some(t => t.key === TAB)) TAB = "home";
+let TAB = "spend";
+try {
+  TAB = localStorage.getItem("roostTab") || "spend";
+  // Spend became the main screen in build 11. Land him there once, whatever tab
+  // he happened to leave open months ago, then respect his choice again.
+  if (!localStorage.getItem("roostSpendFirst")) {
+    TAB = "spend";
+    localStorage.setItem("roostSpendFirst", "1");
+  }
+} catch (e) {}
+if (!TABS.some(t => t.key === TAB)) TAB = "spend";
 
 let SNAP = null, ACCOUNTS = [];
 let SPEND = [], CATS = [], BUDGET = 0, WEEK_START = 0;
@@ -679,6 +780,8 @@ let DRAFT = { amt: "", note: "", date: "" };
 let NEWCAT = false;
 let WEEK_OFF = 0;      // 0 = this week, -1 = last week, ...
 let EDIT_ID = null;    // the row being corrected, if any
+let SHOW_NOTE = false; // the note field costs a row, so it stays folded away
+let SHOW_ALL = false;  // the full category list, in place of the six keys
 
 // The starters only matter until he has logged anything; after that his own
 // habits order the chips.
@@ -736,6 +839,95 @@ const allCategories = () => {
   return [...names].sort();
 };
 
+/// How the week is going, in words. Two lines at most: what it is, and whether
+/// that is better or worse than the same point last week. Same point, not the
+/// whole week, because "you have spent less than a full week" on a Tuesday is
+/// flattery, not feedback.
+function verdictFor(spent, budget, elapsed, thisWeek, tail) {
+  const prev = weekBounds(WEEK_OFF - 1);
+  const cutoff = isoDate(addDays(prev.ws, Math.max(0, elapsed - 1)));
+  const prevRows = inWeek(prev.wsI, prev.weI);
+  const prevSame = sumOf(prevRows.filter(e => e.date <= cutoff));
+  const diff = spent - prevSame;
+
+  let lead, tone = "";
+  if (budget <= 0) {
+    lead = spent > 0 ? "No budget set." : "Nothing logged.";
+  } else if (spent > budget) {
+    lead = "Over budget.";
+    tone = "bad";
+  } else if (!thisWeek) {
+    lead = money2(budget - spent) + " under.";
+    tone = "good";
+  } else if (spent > budget * (elapsed / 7)) {
+    lead = "Spending fast.";
+    tone = "warn";
+  } else {
+    lead = "On track.";
+    tone = "good";
+  }
+
+  const mark = { good: "good", warn: "warn", bad: "bad" }[tone] || "";
+  let h = `<div class="verdict"><span class="lead"><i class="mark ${mark}"></i>${esc(lead)}</span>`;
+  if (prevRows.length) {
+    h += Math.abs(diff) < 0.005
+      ? `Level with last week${thisWeek ? " at this point" : ""}.`
+      : `<b>${money2(Math.abs(diff))}</b> ${diff < 0 ? "less" : "more"} than last
+         week${thisWeek ? " by this day" : ""}.`;
+  } else {
+    h += `Nothing logged last week to compare against.`;
+  }
+  const run = underStreak();
+  if (run >= 2) h += ` ${run} weeks under in a row.`;
+  if (tail) h += ` ${tail}`;
+  return h + `</div>`;
+}
+
+/// Completed weeks, newest first, that came in at or under their own budget.
+function underStreak() {
+  if (!(BUDGET > 0)) return 0;
+  let n = 0;
+  for (let i = 1; i <= 12; i++) {
+    const b = weekBounds(WEEK_OFF - i);
+    const rows = inWeek(b.wsI, b.weI);
+    if (!rows.length) break;
+    if (sumOf(rows) > BUDGET - carryInto(b.wsI)) break;
+    n++;
+  }
+  return n;
+}
+
+/// Eight weeks against the budget line. No axes, no gridlines, no legend: the
+/// dashed rule is the budget and anything crossing it is drawn in the one colour
+/// this app uses to mean trouble.
+function history() {
+  const cols = [];
+  for (let i = 7; i >= 0; i--) {
+    const b = weekBounds(WEEK_OFF - i);
+    cols.push({
+      off: WEEK_OFF - i,
+      tot: sumOf(inWeek(b.wsI, b.weI)),
+      bud: BUDGET > 0 ? BUDGET - carryInto(b.wsI) : 0,
+      label: (b.ws.getMonth() + 1) + "/" + b.ws.getDate(),
+    });
+  }
+  if (!cols.some(c => c.tot > 0)) return "";
+  const H = 96;
+  const max = Math.max(BUDGET, ...cols.map(c => c.tot)) * 1.12 || 1;
+  const line = BUDGET > 0 ? Math.round(BUDGET / max * H) : 0;
+
+  let h = `<div class="cap">EIGHT WEEKS</div><div class="hist">`;
+  if (line > 0) h += `<div class="budgetline" style="bottom:${18 + line}px"></div>`;
+  for (const c of cols) {
+    const px = Math.max(c.tot > 0 ? 2 : 0, Math.round(c.tot / max * H));
+    const cls = c.off === 0 ? "now" : (c.bud > 0 && c.tot > c.bud ? "over" : "");
+    h += `<button class="histcol" data-week="${c.off}" aria-label="${esc(c.label)}">
+        <i class="${cls}" style="height:${px}px"></i>
+        <span>${esc(c.label)}</span></button>`;
+  }
+  return h + `</div>`;
+}
+
 function viewSpend() {
   const today = new Date();
   const { ws, we, wsI, weI } = weekBounds(WEEK_OFF);
@@ -745,174 +937,251 @@ function viewSpend() {
   const budget = BUDGET > 0 ? BUDGET - carry : 0;
   const left = budget - spent;
   const thisWeek = WEEK_OFF === 0;
-  const daysLeft = thisWeek
-    ? Math.max(0, Math.round((we - new Date(isoDate(today) + "T00:00:00")) / 86400000) + 1)
-    : 0;
+  const elapsed = thisWeek
+    ? Math.min(7, Math.round((new Date(isoDate(today) + "T00:00:00") - ws) / 86400000) + 1)
+    : 7;
+  const daysLeft = 7 - elapsed;
 
-  // ---- the week, and the arrows to reach the ones behind it ----
-  let h = `<div class="cap weekbar">
+  // ---- where the week stands ----
+  let h = `<div class="weekbar">
       <button id="wprev" aria-label="Previous week">&#8249;</button>
-      <span class="lbl">${esc(spanLabel(ws, we))}${thisWeek ? "" : ""}</span>
+      <span class="lbl">${esc(spanLabel(ws, we))}</span>
       <button id="wnext" aria-label="Next week" ${thisWeek ? "disabled" : ""}>&#8250;</button>
     </div>
-    <div class="big ${BUDGET > 0 && left < 0 ? "neg" : ""} mono">${money2(spent)}</div>`;
+    <div class="big mono ${budget > 0 && left < 0 ? "neg" : ""}">${money2(spent)}</div>`;
 
-  if (BUDGET > 0) {
-    const pct = budget > 0 ? Math.min(100, Math.round(spent / budget * 100)) : 100;
-    h += `<div class="muted" style="margin-top:4px">of ${money(budget)} &middot;
+  if (budget > 0) {
+    const pct = Math.min(100, Math.round(spent / budget * 100));
+    const state = left < 0 ? "bad"
+      : (thisWeek && spent > budget * (elapsed / 7)) ? "warn" : "good";
+    const paint = { good: "var(--good)", warn: "var(--warn)", bad: "var(--accent)" }[state];
+    h += `<div class="muted" style="margin-top:2px">of ${money2(budget)} &middot;
         <b class="${left < 0 ? "neg" : "pos"}">${left < 0 ? money2(-left) + " over"
                                                           : money2(left) + " left"}</b></div>
-      <div class="bar"><i style="width:${pct}%;background:${
-        left < 0 ? "var(--danger)" : pct > 80 ? "var(--gold)" : "var(--accent)"}"></i></div>`;
-    if (carry > 0) {
-      h += `<div class="card note bad" style="margin-top:10px">
-          <div style="font-size:13px">The week before went over by
-            <b>${money2(carry)}</b>, so this one is <b>${money2(budget)}</b>
-            instead of ${money2(BUDGET)}.</div></div>`;
-    }
-    if (thisWeek && left > 0 && daysLeft > 0) {
-      h += `<div class="tiny" style="margin-top:6px">${money2(left / daysLeft)} a day
-        for the ${daysLeft} day${daysLeft === 1 ? "" : "s"} left</div>`;
-    } else if (left < 0) {
-      h += `<div class="tiny neg" style="margin-top:6px">${thisWeek
-        ? `over by ${money2(-left)} with ${daysLeft} day${daysLeft === 1 ? "" : "s"}
-           still to go. Next week starts at ${money2(BUDGET + left)}.`
-        : `over by ${money2(-left)}, taken out of the week after`}</div>`;
-    }
+      <div class="bar tall"><i style="width:${pct}%;background:${paint}"></i>${
+        thisWeek ? `<u style="left:${Math.round(elapsed / 7 * 100)}%"></u>` : ""}</div>`;
   } else {
-    h += `<div class="muted" style="margin-top:4px">no weekly budget set</div>`;
+    h += `<div class="muted" style="margin-top:2px">no weekly budget set</div>`;
   }
-  h += `<details class="more"><summary>${BUDGET > 0 ? "Change the weekly budget"
-                                                    : "Set a weekly budget"}</summary>
-    <div class="entryrow">
-      <input id="bud" inputmode="decimal" placeholder="0" value="${BUDGET || ""}">
-      <button class="datepill" id="budsave" style="color:var(--accent-hi)">Save</button>
-    </div></details>`;
 
-  // ---- log a payment ----
+  let tail = "";
+  if (budget > 0 && thisWeek && left > 0 && daysLeft >= 0) {
+    tail = `${money2(left / (daysLeft + 1))} a day for the ${daysLeft + 1}
+      day${daysLeft === 0 ? "" : "s"} left.`;
+  } else if (budget > 0 && left < 0 && thisWeek) {
+    tail = `<b class="neg">Next week starts at ${money2(BUDGET + left)}.</b>`;
+  }
+  h += verdictFor(spent, budget, elapsed, thisWeek, tail);
+
+  if (carry > 0) {
+    h += `<div class="note bad" style="margin-top:10px">
+        <div class="tiny">The week before went over by ${money2(carry)}, so this one
+          is ${money2(budget)} instead of ${money2(BUDGET)}.</div></div>`;
+  }
+  // ---- the thing he actually opens the app to do ----
+  // Display, then categories, then the keys. Two taps to log: type it, name it.
+  // The keypad is on the page rather than the phone's, because the OS keyboard
+  // shoves the screen around and puts letters under his thumb when he wants digits.
   h += `<div class="cap">LOG A PAYMENT</div>
-    <div class="amtrow"><span class="cur">$</span>
-      <input id="amt" inputmode="decimal" placeholder="0.00" value="${esc(DRAFT.amt)}"></div>
-    <div class="entryrow">
-      <input id="note" placeholder="Note (optional)" value="${esc(DRAFT.note)}">
-      <input class="datepill" type="date" id="dinp" value="${esc(DRAFT.date || defaultDate())}">
+    <div class="display">
+      <span class="amt mono ${DRAFT.amt ? "" : "zero"}" id="disp"><span class="cur">$</span>${
+        esc(DRAFT.amt || "0.00")}</span>
+      <span class="tiny" id="hint"></span>
     </div>
-    <div class="hint" id="hint"></div>
-    <div class="chips">`;
-  for (const c of topCategories(8)) {
-    h += `<button class="chip" data-cat="${esc(c)}">${esc(c)}</button>`;
-  }
-  h += `<button class="chip add" id="newcat">+ New</button></div>`;
-  if (NEWCAT) {
-    h += `<div class="entryrow">
-        <input id="catname" placeholder="New category name" autocomplete="off">
-        <button class="datepill" id="catsave" style="color:var(--accent-hi)">Add</button>
-      </div>`;
+    <div class="metarow">
+      <input type="date" id="dinp" value="${esc(DRAFT.date || defaultDate())}">
+      <button id="notetoggle" class="${DRAFT.note ? "on" : ""}">${
+        DRAFT.note ? "note added" : "+ note"}</button>
+    </div>`;
+  if (SHOW_NOTE) {
+    h += `<div class="entryrow"><input id="note" placeholder="What was it for?"
+      value="${esc(DRAFT.note)}"></div>`;
   }
 
-  const groups = {};
-  for (const c of CATS) {
-    const g = c.group || "Other";
-    (groups[g] = groups[g] || []).push(c.name);
-  }
-  const groupNames = Object.keys(groups).sort();
-  if (groupNames.length) {
-    h += `<details class="more"><summary>All categories</summary><div class="chips">`;
-    for (const g of groupNames) {
+  if (SHOW_ALL) {
+    const groups = {};
+    for (const c of CATS) {
+      const g = c.group || "Other";
+      (groups[g] = groups[g] || []).push(c.name);
+    }
+    h += `<div class="chips">`;
+    for (const g of Object.keys(groups).sort()) {
       h += `<div class="grouphead">${esc(g.toUpperCase())}</div>`;
       for (const name of groups[g].slice().sort()) {
         h += `<button class="chip" data-cat="${esc(name)}">${esc(name)}</button>`;
       }
     }
-    h += `</div></details>`;
+    h += `<button class="chip add" id="newcat">+ New category</button>
+      <button class="chip" id="lesscats">Back</button></div>`;
+  } else {
+    h += `<div class="catgrid">`;
+    for (const c of topCategories(5)) {
+      h += `<button class="catkey" data-cat="${esc(c)}">${esc(c)}</button>`;
+    }
+    h += `<button class="catkey more" id="morecats">More</button></div>`;
   }
-  h += `<div class="tiny" style="margin-top:10px">Type the amount, tap a category.
-    Tap anything you've logged to fix it. This is your own tally, it doesn't touch
-    your accounts, net worth or the payoff plan.</div>`;
+  if (NEWCAT) {
+    h += `<div class="entryrow">
+        <input id="catname" placeholder="New category name" autocomplete="off">
+        <button class="datepill" id="catsave">Add</button>
+      </div>`;
+  }
 
-  // ---- the week's entries, each one correctable ----
+  h += `<div class="keypad">`;
+  for (const k of ["1","2","3","4","5","6","7","8","9",".","0","back"]) {
+    h += `<button class="key ${k === "back" ? "del" : k === "." ? "fn" : ""}"
+      data-key="${k}">${k === "back" ? "&#9003;" : k}</button>`;
+  }
+  h += `</div>`;
+
+  // ---- the log itself ----
   if (week.length) {
-    h += `<div class="cap">${thisWeek ? "THIS WEEK" : "THAT WEEK"} &mdash;
-      ${week.length} PAYMENT${week.length === 1 ? "" : "S"}</div>`;
+    h += `<div class="cap">${thisWeek ? "THIS WEEK" : "THAT WEEK"}</div>`;
     const days = [...new Set(week.map(e => e.date))].sort().reverse();
     for (const d of days) {
       const rows = week.filter(e => e.date === d)
         .sort((a, b) => String(b.created || "").localeCompare(String(a.created || "")));
       h += `<div class="daysep">${esc(dayLabel(d))} &middot; ${money2(sumOf(rows))}</div>`;
-      h += `<div class="card">`;
       for (const e of rows) {
         h += e._id === EDIT_ID ? editRow(e) : `<div class="ent tap" data-edit="${esc(e._id)}">
-            <b class="mono" style="font-size:15px;min-width:74px">${money2(e.amount)}</b>
+            <b class="mono" style="min-width:76px">${money2(e.amount)}</b>
             <span style="flex:1;min-width:0">
-              <span style="font-size:13px">${esc(e.category || "Uncategorized")}</span>${
-                e.source === "fuelwise" ? `<span class="src">FuelWise</span>` : ""}
+              <span>${esc(e.category || "Uncategorized")}</span>${
+                e.source === "fuelwise" ? `<span class="src">FUELWISE</span>` : ""}
               ${e.note ? `<div class="tiny">${esc(e.note)}</div>` : ""}
             </span>
             <span class="x" aria-hidden="true">&rsaquo;</span>
           </div>`;
       }
-      h += `</div>`;
     }
 
     const cats = byCategory(week);
     const peak = cats[0].amount || 1;
-    h += `<div class="cap">WHERE IT WENT</div><div class="card">`;
-    for (const c of cats) {
-      h += `<div style="margin-bottom:10px">
-          <div class="row"><span style="font-size:13px">${esc(c.category)}</span>
-            <b class="mono" style="font-size:13px">${money2(c.amount)}</b></div>
-          <div class="bar"><i style="width:${Math.round(c.amount / peak * 100)}%"></i></div>
+    h += `<div class="cap">WHERE IT WENT</div>`;
+    cats.forEach((c, i) => {
+      h += `<div style="margin-bottom:12px">
+          <div class="row"><span>${esc(c.category)}</span>
+            <b class="mono">${money2(c.amount)}</b></div>
+          <div class="bar tall s${i % 6}"><i style="width:${
+            Math.round(c.amount / peak * 100)}%"></i></div>
         </div>`;
-    }
-    h += `</div>`;
+    });
   } else {
     h += `<div class="cap">${thisWeek ? "THIS WEEK" : "THAT WEEK"}</div>
-      <div class="empty"><span class="em">&#129534;</span>Nothing logged${
-        thisWeek ? " yet this week" : " that week"}.</div>`;
+      <div class="empty">Nothing logged${thisWeek ? " yet this week" : " that week"}.</div>`;
   }
 
-  // ---- the four weeks behind it: what to cut ----
-  const weeks = [];
+  h += history();
+
+  // ---- four weeks of habit, which is where a cut actually comes from ----
+  const past = [];
   for (let i = 1; i <= 4; i++) {
-    const a = addDays(ws, -7 * i), b = addDays(a, 6);
-    weeks.push({ off: WEEK_OFF - i, a, b, entries: inWeek(isoDate(a), isoDate(b)) });
+    const b = weekBounds(WEEK_OFF - i);
+    const rows = inWeek(b.wsI, b.weI);
+    if (rows.length) past.push(rows);
   }
-  const past = weeks.filter(w => w.entries.length);
   if (past.length) {
-    const avg = past.reduce((t, w) => t + sumOf(w.entries), 0) / past.length;
-    h += `<div class="cap">THE FOUR WEEKS BEFORE</div><div class="card">`;
-    for (const w of past) {
-      const tot = sumOf(w.entries);
-      const bud = BUDGET > 0 ? BUDGET - carryInto(isoDate(w.a)) : 0;
-      const over = bud > 0 ? tot - bud : 0;
-      h += `<div class="row ent tap" data-week="${w.off}" style="padding:7px 0">
-          <span class="muted" style="font-size:12px">${esc(spanLabel(w.a, w.b))}</span>
-          <span><b class="mono" style="font-size:13px">${money2(tot)}</b>
-            ${bud > 0 ? `<span class="tiny ${over > 0 ? "neg" : "pos"}">
-              ${over > 0 ? " +" + money(over) + " over" : " " + money(-over) + " under"}</span>` : ""}
-            <span class="x" aria-hidden="true">&rsaquo;</span></span>
-        </div>`;
-    }
-    h += `<div class="row" style="border-top:1px solid var(--border);margin-top:6px;padding-top:8px">
-        <span class="muted" style="font-size:12px">Weekly average</span>
-        <b class="mono ${BUDGET > 0 && avg > BUDGET ? "neg" : ""}" style="font-size:13px">${money2(avg)}</b>
-      </div></div>`;
-
-    const all = past.flatMap(w => w.entries);
+    const all = past.flat();
     const cats = byCategory(all).slice(0, 6);
     const peak = cats[0].amount || 1;
-    h += `<div class="cap">WHERE TO CUT &mdash; LAST 4 WEEKS</div><div class="card">`;
-    for (const c of cats) {
-      h += `<div style="margin-bottom:10px">
-          <div class="row"><span style="font-size:13px">${esc(c.category)}</span>
-            <span><b class="mono" style="font-size:13px">${money2(c.amount)}</b>
+    h += `<div class="cap">WHERE TO CUT, LAST 4 WEEKS</div>`;
+    cats.forEach((c, i) => {
+      h += `<div style="margin-bottom:12px">
+          <div class="row"><span>${esc(c.category)}</span>
+            <span><b class="mono">${money2(c.amount)}</b>
               <span class="tiny"> ${money2(c.amount / past.length)}/wk</span></span></div>
-          <div class="bar"><i style="width:${Math.round(c.amount / peak * 100)}%"></i></div>
+          <div class="bar tall s${i % 6}"><i style="width:${
+            Math.round(c.amount / peak * 100)}%"></i></div>
         </div>`;
-    }
-    h += `</div>`;
+    });
   }
+  h += `<div class="cap">WEEKLY BUDGET</div>
+    <div class="entryrow" style="margin-top:0">
+      <input id="bud" inputmode="decimal" placeholder="0" value="${BUDGET || ""}">
+      <button class="datepill" id="budsave">Save</button>
+    </div>
+    <div class="tiny" style="margin-top:8px">Weeks run Sunday to Saturday. Go over and
+      the difference comes out of the week after.</div>`;
   return h;
+}
+
+/// Digits go straight into the draft and only the display is redrawn. Repainting
+/// the whole screen on every key would make the one screen he uses most feel slow.
+function pressKey(k) {
+  let v = DRAFT.amt || "";
+  if (k === "back") {
+    v = v.slice(0, -1);
+  } else if (k === ".") {
+    if (v.includes(".")) return;
+    v = (v || "0") + ".";
+  } else {
+    const dec = v.split(".")[1];
+    if (dec !== undefined && dec.length >= 2) return;
+    if (v.replace(".", "").length >= 7) return;
+    v = (v === "0" ? "" : v) + k;
+  }
+  DRAFT.amt = v;
+  const el = $("disp");
+  if (el) {
+    el.innerHTML = `<span class="cur">$</span>${esc(v || "0.00")}`;
+    el.classList.toggle("zero", !v);
+  }
+  const hint = $("hint");
+  if (hint) hint.textContent = "";
+}
+
+function wireSpend() {
+  for (const b of document.querySelectorAll("[data-key]")) {
+    b.onclick = () => pressKey(b.dataset.key);
+  }
+  for (const b of document.querySelectorAll("[data-cat]")) {
+    b.onclick = () => logSpend(b.dataset.cat);
+  }
+  for (const b of document.querySelectorAll("[data-edit]")) {
+    b.onclick = () => { EDIT_ID = b.dataset.edit; paint(); };
+  }
+  for (const b of document.querySelectorAll("[data-week]")) {
+    b.onclick = () => goWeek(parseInt(b.dataset.week, 10));
+  }
+
+  const dinp = $("dinp");
+  if (dinp) dinp.onchange = () => { DRAFT.date = dinp.value; };
+  const note = $("note");
+  if (note) note.oninput = () => { DRAFT.note = note.value; };
+  const nt = $("notetoggle");
+  if (nt) nt.onclick = () => { SHOW_NOTE = !SHOW_NOTE; paint(); const f = $("note"); if (f) f.focus(); };
+
+  const more = $("morecats"), less = $("lesscats");
+  if (more) more.onclick = () => { SHOW_ALL = true; paint(); };
+  if (less) less.onclick = () => { SHOW_ALL = false; NEWCAT = false; paint(); };
+
+  const prev = $("wprev"), next = $("wnext");
+  if (prev) prev.onclick = () => goWeek(WEEK_OFF - 1);
+  if (next) next.onclick = () => goWeek(WEEK_OFF + 1);
+
+  const save = $("esave"), cancel = $("ecancel"), del = $("edel");
+  if (save) save.onclick = () => saveEdit();
+  if (cancel) cancel.onclick = () => { EDIT_ID = null; paint(); };
+  if (del) del.onclick = () => { const id = EDIT_ID; EDIT_ID = null; removeEntry(id); };
+
+  const nc = $("newcat");
+  if (nc) nc.onclick = () => { NEWCAT = !NEWCAT; paint(); const f = $("catname"); if (f) f.focus(); };
+  const cs = $("catsave"), cn = $("catname");
+  if (cs) cs.onclick = () => addCategory(cn ? cn.value : "");
+  if (cn) cn.addEventListener("keydown", e => { if (e.key === "Enter") addCategory(cn.value); });
+
+  const bs = $("budsave"), bud = $("bud");
+  if (bs) bs.onclick = () => saveBudget(bud ? bud.value : "");
+  if (bud) bud.addEventListener("keydown", e => { if (e.key === "Enter") saveBudget(bud.value); });
+}
+
+function goWeek(off) {
+  if (off > 0) return;                  // there is nothing to see in the future
+  WEEK_OFF = off;
+  EDIT_ID = null;
+  DRAFT.date = "";                      // let the new week pick the default
+  paint();
+  window.scrollTo({ top: 0, behavior: "instant" });
 }
 
 /// A logged payment opened for correction. Everything about it is editable,
@@ -948,54 +1217,6 @@ function defaultDate() {
   return between(today, wsI, weI) ? today : isoDate(we);
 }
 
-function wireSpend() {
-  const amt = $("amt"), note = $("note"), dinp = $("dinp");
-  if (amt) amt.oninput = () => { DRAFT.amt = amt.value; };
-  if (note) note.oninput = () => { DRAFT.note = note.value; };
-  if (dinp) dinp.onchange = () => { DRAFT.date = dinp.value; };
-  if (amt) amt.addEventListener("keydown", e => { if (e.key === "Enter") amt.blur(); });
-
-  for (const b of document.querySelectorAll("[data-cat]")) {
-    b.onclick = () => logSpend(b.dataset.cat);
-  }
-  for (const b of document.querySelectorAll("[data-edit]")) {
-    b.onclick = () => { EDIT_ID = b.dataset.edit; paint(); };
-  }
-  for (const b of document.querySelectorAll("[data-week]")) {
-    b.onclick = () => goWeek(parseInt(b.dataset.week, 10));
-  }
-
-  const prev = $("wprev"), next = $("wnext");
-  if (prev) prev.onclick = () => goWeek(WEEK_OFF - 1);
-  if (next) next.onclick = () => goWeek(WEEK_OFF + 1);
-
-  const save = $("esave"), cancel = $("ecancel"), del = $("edel");
-  if (save) save.onclick = () => saveEdit();
-  if (cancel) cancel.onclick = () => { EDIT_ID = null; paint(); };
-  if (del) del.onclick = () => { const id = EDIT_ID; EDIT_ID = null; removeEntry(id); };
-
-  const nc = $("newcat");
-  if (nc) nc.onclick = () => { NEWCAT = !NEWCAT; paint(); const f = $("catname"); if (f) f.focus(); };
-  const cs = $("catsave"), cn = $("catname");
-  if (cs) cs.onclick = () => addCategory(cn ? cn.value : "");
-  if (cn) cn.addEventListener("keydown", e => { if (e.key === "Enter") addCategory(cn.value); });
-
-  const bs = $("budsave"), bud = $("bud");
-  if (bs) bs.onclick = () => saveBudget(bud ? bud.value : "");
-  if (bud) bud.addEventListener("keydown", e => { if (e.key === "Enter") saveBudget(bud.value); });
-}
-
-function goWeek(off) {
-  if (off > 0) return;                  // there is nothing to see in the future
-  WEEK_OFF = off;
-  EDIT_ID = null;
-  DRAFT.date = "";                      // let the new week pick the default
-  paint();
-  window.scrollTo({ top: 0, behavior: "instant" });
-}
-
-/// Save a correction. The whole row is rewritten, keeping `created` and `source`
-/// so a FuelWise charge stays recognisable as one.
 function saveEdit() {
   const id = EDIT_ID;
   const e = SPEND.find(x => x._id === id);
@@ -1023,14 +1244,20 @@ function hint(msg) {
   if (el) el.textContent = msg;
 }
 
+/// The amount is typed on our own keypad now, so there is no field to focus.
+function needAmount() {
+  hint("Enter an amount");
+  const d = $("disp");
+  if (d) { d.classList.add("zero"); }
+}
+
 // Writes are optimistic: the list updates now and the network catches up. With
 // the persistent cache an offline write is queued, so awaiting it before showing
 // anything would leave him staring at a dead screen in a checkout line.
 function logSpend(category) {
   const amount = Math.round(parseFloat(String(DRAFT.amt).replace(/[^0-9.]/g, "")) * 100) / 100;
   if (!(amount > 0)) {
-    hint("Enter an amount first.");
-    const a = $("amt"); if (a) a.focus();
+    needAmount();
     return;
   }
   const rec = {
@@ -1045,7 +1272,7 @@ function logSpend(category) {
   const ref = doc(collection(db, "spend_log"));
   SPEND.push({ ...rec, _id: ref.id });
   DRAFT.amt = ""; DRAFT.note = "";
-  NEWCAT = false;
+  NEWCAT = false; SHOW_NOTE = false; SHOW_ALL = false;
   paint();
   setDoc(ref, rec).catch(e => toast("Couldn't save that: " + (e.message || e)));
   toast("Logged " + money2(amount) + " · " + category, "Undo", () => removeEntry(ref.id));
