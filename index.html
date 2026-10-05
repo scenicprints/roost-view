@@ -439,6 +439,7 @@ if (!TABS.some(t => t.key === TAB)) TAB = "spend";
 
 let SNAP = null, ACCOUNTS = [];
 let SPEND = [], CATS = [], BUDGET = 0, WEEK_START = 0;
+let ROLLOVER = true, ROLL_CAP = 4;   // carry both ways; credit floored at N weeks (0 = no cap)
 
 function paintTabs() {
   $("tabs").innerHTML = TABS.map(t => {
@@ -489,6 +490,8 @@ async function load() {
     const st = setDocSnap.exists() ? setDocSnap.data() : {};
     BUDGET = +st.weekly_budget || 0;
     WEEK_START = Number.isInteger(st.week_start) ? st.week_start : 0;   // 0 = Sunday
+    ROLLOVER = st.rollover !== false;                                   // default on
+    ROLL_CAP = Number.isFinite(+st.rollover_cap_weeks) ? +st.rollover_cap_weeks : 4;
     SPEND = logSnap.docs.map(d => ({ ...d.data(), _id: d.id }));
     CATS = catSnap.docs.map(d => d.data()).filter(c => c && c.name);
     paintTabs();
@@ -793,21 +796,43 @@ function weekBounds(off) {
 
 const inWeek = (wsI, weI) => SPEND.filter(e => between(e.date, wsI, weI));
 
-/// Overspend rolls forward. A week that ends over its budget takes the overage
-/// out of the next week, and it keeps taking it until a lean week clears it.
-/// Debt direction only (his call): coming in under does not bank anything, and
-/// nothing is ever forgiven, so the number always matches what he actually spent.
+/// Carry between weeks, SIGNED. Positive = owed, negative = banked.
+///
+/// Overspend rolls forward as a debt that shrinks the next budget and keeps
+/// taking until a lean week clears it. Underspend rolls forward as credit that
+/// grows the next budget, so a lean week is how he saves up for something inside
+/// the budget instead of putting it on a card. ROLLOVER off restores the old
+/// debt-only behaviour.
+///
+/// A week with NOTHING logged moves the carry neither way. Forgetting to log is
+/// not the same as spending nothing: without this guard a gap in the log would
+/// mint a full week of phantom credit, and in the old code it silently forgave a
+/// full week of real debt.
+///
+/// Banked credit is floored at ROLL_CAP weeks of budget so a long quiet stretch
+/// cannot become a blank cheque. Debt has no cap and is never forgiven.
 function carryInto(wsI) {
   if (!(BUDGET > 0) || !SPEND.length) return 0;
   const earliest = SPEND.reduce((m, e) => (e.date < m ? e.date : m), SPEND[0].date);
+  const floor = ROLL_CAP > 0 ? -BUDGET * ROLL_CAP : -Infinity;
   let d = weekStartOf(new Date(earliest + "T00:00:00"));
   let carry = 0;
   for (let guard = 0; isoDate(d) < wsI && guard < 400; guard++) {
     const a = isoDate(d), b = isoDate(addDays(d, 6));
-    carry = Math.max(0, sumOf(inWeek(a, b)) - (BUDGET - carry));
+    const rows = inWeek(a, b);
+    if (rows.length) {
+      carry = sumOf(rows) - (BUDGET - carry);
+      carry = ROLLOVER ? Math.max(carry, floor) : Math.max(carry, 0);
+    }
     d = addDays(d, 7);
   }
   return Math.round(carry * 100) / 100;
+}
+
+/// What next week opens at if this week ends exactly where it stands now.
+function nextBudgetAfter(left) {
+  const floor = ROLL_CAP > 0 ? -BUDGET * ROLL_CAP : -Infinity;
+  return BUDGET - (ROLLOVER ? Math.max(-left, floor) : Math.max(-left, 0));
 }
 
 const allCategories = () => {
@@ -945,15 +970,27 @@ function viewSpend() {
   if (budget > 0 && thisWeek && left > 0 && daysLeft >= 0) {
     tail = `${money2(left / (daysLeft + 1))} a day for the ${daysLeft + 1}
       day${daysLeft === 0 ? "" : "s"} left.`;
+    // Last day only. Before that the week is not settled, and promising him a
+    // bigger next week while he can still spend it is flattery, not feedback.
+    if (ROLLOVER && daysLeft === 0) {
+      tail += ` <b class="pos">Next week starts at ${money2(nextBudgetAfter(left))}.</b>`;
+    }
   } else if (budget > 0 && left < 0 && thisWeek) {
-    tail = `<b class="neg">Next week starts at ${money2(BUDGET + left)}.</b>`;
+    // Over is settled the moment it happens, so this one shows on any day.
+    tail = `<b class="neg">Next week starts at ${money2(nextBudgetAfter(left))}.</b>`;
   }
   h += verdictFor(spent, budget, elapsed, thisWeek, tail);
 
   if (carry > 0) {
     h += `<div class="note bad" style="margin-top:10px">
-        <div class="tiny">The week before went over by ${money2(carry)}, so this one
+        <div class="tiny">Carried over: ${money2(carry)} of overspend, so this week
           is ${money2(budget)} instead of ${money2(BUDGET)}.</div></div>`;
+  } else if (carry < 0) {
+    const atCap = ROLL_CAP > 0 && -carry >= BUDGET * ROLL_CAP - 0.005;
+    h += `<div class="note good" style="margin-top:10px">
+        <div class="tiny">Banked: ${money2(-carry)} from weeks you came in under, so
+          this week is ${money2(budget)} instead of ${money2(BUDGET)}.${
+          atCap ? ` That is the ${ROLL_CAP}-week cap.` : ""}</div></div>`;
   }
   // ---- the thing he actually opens the app to do ----
   // The amount field and the chips, unchanged. An on-page keypad was tried here
@@ -1072,8 +1109,17 @@ function viewSpend() {
       <input id="bud" inputmode="decimal" placeholder="0" value="${BUDGET || ""}">
       <button class="datepill" id="budsave">Save</button>
     </div>
-    <div class="tiny" style="margin-top:8px">Weeks run Sunday to Saturday. Go over and
-      the difference comes out of the week after.</div>`;
+    <div class="row" style="margin-top:12px">
+      <span>Roll the difference forward</span>
+      <button class="datepill" id="rolltog">${ROLLOVER ? "Both ways" : "Overspend only"}</button>
+    </div>
+    <div class="tiny" style="margin-top:8px">Weeks run Sunday to Saturday. ${
+      ROLLOVER
+        ? `Go over and the difference comes out of the week after. Come in under and it
+           is added on${ROLL_CAP > 0 ? `, up to ${ROLL_CAP} weeks of banked credit` : ""},
+           so a lean week is how you save up for something.`
+        : `Go over and the difference comes out of the week after. Coming in under banks
+           nothing.`} A week with nothing logged moves it neither way.</div>`;
   return h;
 }
 
@@ -1114,6 +1160,9 @@ function wireSpend() {
   const bs = $("budsave"), bud = $("bud");
   if (bs) bs.onclick = () => saveBudget(bud ? bud.value : "");
   if (bud) bud.addEventListener("keydown", e => { if (e.key === "Enter") saveBudget(bud.value); });
+
+  const rt = $("rolltog");
+  if (rt) rt.onclick = () => saveRollover(!ROLLOVER);
 }
 
 function goWeek(off) {
@@ -1251,6 +1300,15 @@ function saveBudget(raw) {
          { weekly_budget: v, week_start: WEEK_START }, { merge: true })
     .catch(e => toast("Couldn't save the budget: " + (e.message || e)));
   toast("Weekly budget " + money(v));
+}
+
+function saveRollover(on) {
+  ROLLOVER = !!on;
+  paint();
+  setDoc(doc(db, "meta", "spend_settings"),
+         { rollover: ROLLOVER, rollover_cap_weeks: ROLL_CAP }, { merge: true })
+    .catch(e => toast("Couldn't save that: " + (e.message || e)));
+  toast(ROLLOVER ? "Underspend now rolls over too" : "Only overspend rolls over");
 }
 
 let TOAST_T = null;

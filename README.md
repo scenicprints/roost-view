@@ -45,6 +45,40 @@ The week runs Sunday to Saturday (`week_start: 0`, stored, not hardcoded).
 Below the log: this week by category, the four weeks before it against the
 budget, and a four-week category ranking — the "where can I cut" view.
 
+### Carry between weeks
+
+`carryInto(weekStart)` returns a **signed** carry: positive is owed, negative is
+banked. Overspend rolls forward as a debt that shrinks the next budget and keeps
+taking until a lean week clears it. Underspend rolls forward as credit that grows
+it, so a lean week is how he saves up for something inside the budget instead of
+putting it on a card.
+
+Settings live beside the budget in `meta/spend_settings`:
+
+| key | default | meaning |
+|---|---|---|
+| `rollover` | `true` | both directions. `false` restores the old debt-only behaviour. |
+| `rollover_cap_weeks` | `4` | banked credit is floored at N weeks of budget. `0` = uncapped. |
+
+Two guards, both deliberate:
+
+- **A week with nothing logged moves the carry neither way.** Forgetting to log is
+  not the same as spending nothing. Without this a gap in the log would mint a
+  full week of phantom credit, and the old debt-only code silently *forgave* a
+  full week of real debt the same way.
+- **Credit is capped, debt is not.** A long quiet stretch cannot turn the budget
+  into a blank cheque, and overspend is never forgiven.
+
+The header note reads "Carried over: $X of overspend" or "Banked: $X from weeks
+you came in under", and says what this week is instead of the base budget. The
+"next week starts at" line shows any day when he is over, because over is settled
+the moment it happens, but only on the last day when he is under, because telling
+him on Tuesday that next week will be bigger is flattery, not feedback.
+
+**Rollover only means anything if the logging is complete.** A week he half-logged
+looks like a lean week and banks credit he never earned. The zero-row guard catches
+a blank week, not a partial one.
+
 Writes are optimistic and Firestore runs with a persistent local cache, so a
 purchase logged in a store with no signal is queued and sent on reconnect
 instead of being lost.
