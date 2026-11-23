@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#f0efec" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#141414" media="(prefers-color-scheme: dark)">
 <meta http-equiv="Cache-Control" content="no-cache, must-revalidate">
-<meta name="build" content="12">
+<meta name="build" content="14">
 <!-- Home-screen install: opens standalone (no browser bars), own icon. -->
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -184,6 +184,21 @@
   .entryrow>input.datepill,.entryrow>button{flex:0 0 auto;width:auto}
   .datepill{background:var(--panel);border:1px solid var(--line2);color:var(--ink);
     padding:0 12px;min-height:44px;font-size:13px;white-space:nowrap}
+  .entryrow>select{margin:0;flex:0 0 auto;width:auto;min-height:44px;padding:0 12px;
+    font-size:13px;-webkit-appearance:menulist;appearance:menulist}
+
+  /* ---- the budget builder: take-home minus the bills ---- */
+  .bill{display:flex;align-items:center;gap:10px;padding:11px 0;
+    border-bottom:1px solid var(--line);cursor:pointer;min-height:44px}
+  .bill .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .bill .x{color:var(--ink3);font-size:15px;padding-left:4px;flex:none}
+  .billopen{padding:2px 0 12px 14px;border-bottom:1px solid var(--line);
+    border-left:2px solid var(--line2)}
+  .billopen .line{border-top:none;border-bottom:1px solid var(--line);padding:4px 0}
+  .billopen .line .n{font-size:13px}
+  .xbtn{background:none;border:none;color:var(--ink3);font-size:18px;padding:6px 10px;
+    line-height:1;flex:none}
+  .linkbtn{background:none;border:none;color:var(--accent);font-size:12px;padding:10px 0 0}
 
   /* ---- the log ---- */
   .daysep{color:var(--ink3);font-size:10px;font-weight:600;letter-spacing:.14em;
@@ -440,6 +455,7 @@ if (!TABS.some(t => t.key === TAB)) TAB = "spend";
 let SNAP = null, ACCOUNTS = [];
 let SPEND = [], CATS = [], BUDGET = 0, WEEK_START = 0;
 let ROLLOVER = true, ROLL_CAP = 4;   // carry both ways; credit floored at N weeks (0 = no cap)
+let TAKE_HOME = 0, TAKE_PER = "month", BILLS = [];   // the budget builder, see viewBudget
 
 function paintTabs() {
   $("tabs").innerHTML = TABS.map(t => {
@@ -492,6 +508,20 @@ async function load() {
     WEEK_START = Number.isInteger(st.week_start) ? st.week_start : 0;   // 0 = Sunday
     ROLLOVER = st.rollover !== false;                                   // default on
     ROLL_CAP = Number.isFinite(+st.rollover_cap_weeks) ? +st.rollover_cap_weeks : 4;
+    TAKE_HOME = +st.take_home > 0 ? +st.take_home : 0;
+    TAKE_PER = PAY_PER[st.take_home_per] ? st.take_home_per : "month";
+    BILLS = (Array.isArray(st.bills) ? st.bills : [])
+      .filter(b => b && b.name)
+      .map(b => ({
+        id: String(b.id || newId()),
+        name: String(b.name),
+        amounts: (Array.isArray(b.amounts) ? b.amounts : [])
+          .map(Number).filter(n => Number.isFinite(n) && n >= 0),
+      }));
+    // The builder IS the budget while take-home is set. Derive it rather than
+    // trust the stored copy, so the number on screen can never drift from the
+    // inputs under it.
+    if (builderOn()) BUDGET = weeklyLeft();
     SPEND = logSnap.docs.map(d => ({ ...d.data(), _id: d.id }));
     CATS = catSnap.docs.map(d => d.data()).filter(c => c && c.name);
     paintTabs();
@@ -930,6 +960,112 @@ function history() {
   return h + `</div>`;
 }
 
+// ---- the budget builder ------------------------------------------------------
+// Where the weekly number comes from. Take-home pay minus the monthly bills,
+// spread over 52 weeks. A bill that moves month to month (electric, gas, water)
+// is entered once per statement and budgeted at the AVERAGE of what it has
+// actually run, so one high month does not set the budget and one low month
+// does not flatter it. Lives in meta/spend_settings beside the budget it writes.
+const PAY_PER = {
+  month: ["Monthly", 1],
+  half:  ["Twice a month", 2],
+  "2wk": ["Every 2 weeks", 26 / 12],
+  wk:    ["Weekly", 52 / 12],
+};
+let BILL_DRAFT = { name: "", amt: "", more: "" };   // survives a repaint, like DRAFT
+let BILL_OPEN = null;                                // the bill whose amounts are showing
+const newId = () => (self.crypto && crypto.randomUUID) ? crypto.randomUUID()
+  : "c" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+const sumNums = xs => xs.reduce((t, n) => t + (+n || 0), 0);
+const billKey = s => String(s || "").trim().toLowerCase().replace(/\s+/g, " ");
+const billAvg = b => b.amounts.length ? sumNums(b.amounts) / b.amounts.length : 0;
+const monthlyIncome = () => TAKE_HOME * (PAY_PER[TAKE_PER] || PAY_PER.month)[1];
+const monthlyBills = () => BILLS.reduce((t, b) => t + billAvg(b), 0);
+const builderOn = () => TAKE_HOME > 0;
+/// What is left each week once the bills are paid. Floored at zero: a budget of
+/// minus forty dollars is not a budget, it is a warning, and the screen says so.
+const weeklyLeft = () =>
+  Math.max(0, Math.round((monthlyIncome() - monthlyBills()) * 12 / 52 * 100) / 100);
+const parseMoney = raw => Math.round(parseFloat(String(raw).replace(/[^0-9.]/g, "")) * 100) / 100;
+
+function viewBudget() {
+  const on = builderOn();
+  const inc = monthlyIncome(), bills = monthlyBills(), leftMo = inc - bills;
+  let h = `<div class="cap">WEEKLY BUDGET</div>`;
+  if (on) {
+    const nb = BILLS.length;
+    h += `<div class="row" style="align-items:baseline">
+        <span class="big mono ${leftMo < 0 ? "neg" : ""}" style="font-size:30px">${money2(weeklyLeft())}</span>
+        <span class="tiny" style="text-align:right;max-width:60%">${
+          leftMo < 0
+            ? `your bills run <b class="neg">${money2(-leftMo)}</b> a month more than you bring home`
+            : `${money2(leftMo)} left each month after ${nb} bill${nb === 1 ? "" : "s"}, over 52 weeks`
+        }</span></div>`;
+  } else {
+    h += `<div class="entryrow" style="margin-top:0">
+        <input id="bud" inputmode="decimal" placeholder="0" value="${BUDGET || ""}">
+        <button class="datepill" id="budsave">Save</button>
+      </div>`;
+  }
+
+  h += `<div class="cap">TAKE-HOME PAY</div>
+    <div class="entryrow" style="margin-top:0">
+      <input id="th" inputmode="decimal" placeholder="What lands in the bank"
+        value="${TAKE_HOME || ""}">
+      <select id="thper" aria-label="How often you are paid">${
+        Object.entries(PAY_PER).map(([k, [lbl]]) =>
+          `<option value="${k}"${k === TAKE_PER ? " selected" : ""}>${lbl}</option>`).join("")
+      }</select>
+    </div>`;
+  h += `<div class="tiny" style="margin-top:6px">${
+    on ? (TAKE_PER === "month" ? "" : `${money2(inc)} a month. `)
+         + "The weekly budget above is worked out from this and the bills below. Clear it to set the budget by hand."
+       : "Enter it and the weekly budget is worked out from it and the bills below. Blank means you set the budget by hand."
+  }</div>`;
+
+  h += `<div class="cap row"><span>MONTHLY BILLS</span>${
+    BILLS.length ? `<span class="mono">${money2(bills)}/mo</span>` : ""}</div>`;
+  const sorted = BILLS.slice().sort((a, b) => billAvg(b) - billAvg(a));
+  for (const b of sorted) {
+    const n = b.amounts.length, open = BILL_OPEN === b.id;
+    h += `<div class="bill" data-bill="${esc(b.id)}">
+        <span class="nm">${esc(b.name)}</span>
+        <span class="tiny">${n > 1 ? `avg of ${n}` : ""}</span>
+        <b class="mono" style="min-width:76px;text-align:right">${money2(billAvg(b))}</b>
+        <span class="x" aria-hidden="true">${open ? "&#8964;" : "&rsaquo;"}</span>
+      </div>`;
+    if (open) {
+      h += `<div class="billopen">`;
+      b.amounts.forEach((a, i) => {
+        h += `<div class="line"><span class="n mono">${money2(a)}</span>
+            <button class="xbtn" data-billamt="${esc(b.id)}|${i}"
+              aria-label="Remove this amount">&times;</button></div>`;
+      });
+      h += `<div class="entryrow">
+          <input id="ba" inputmode="decimal" placeholder="Another month's amount"
+            value="${esc(BILL_DRAFT.more)}">
+          <button class="datepill" id="baadd">Add</button>
+        </div>
+        <button class="linkbtn" data-billdel="${esc(b.id)}">Remove ${esc(b.name)}</button>
+      </div>`;
+    }
+  }
+  h += `<div class="entryrow">
+      <input id="billname" list="billnames" placeholder="Company" autocomplete="off"
+        value="${esc(BILL_DRAFT.name)}">
+      <input id="billamt" inputmode="decimal" placeholder="0.00" style="flex:0 0 100px"
+        value="${esc(BILL_DRAFT.amt)}">
+      <button class="datepill" id="billadd">Add</button>
+    </div>
+    <datalist id="billnames">${
+      BILLS.map(b => `<option value="${esc(b.name)}">`).join("")}</datalist>
+    <div class="tiny" style="margin-top:8px">Add a company again with another month's
+      amount and it is budgeted at the average, so a bill that moves (electric, gas,
+      water) counts at what it really runs. Tap a bill to see each amount or take one
+      out.</div>`;
+  return h;
+}
+
 function viewSpend() {
   const today = new Date();
   const { ws, we, wsI, weI } = weekBounds(WEEK_OFF);
@@ -1104,12 +1240,8 @@ function viewSpend() {
   }
   if (hist || past4.length) h += `</details>`;
 
-  h += `<div class="cap">WEEKLY BUDGET</div>
-    <div class="entryrow" style="margin-top:0">
-      <input id="bud" inputmode="decimal" placeholder="0" value="${BUDGET || ""}">
-      <button class="datepill" id="budsave">Save</button>
-    </div>
-    <div class="row" style="margin-top:12px">
+  h += viewBudget();
+  h += `<div class="row" style="margin-top:20px">
       <span>Roll the difference forward</span>
       <button class="datepill" id="rolltog">${ROLLOVER ? "Both ways" : "Overspend only"}</button>
     </div>
@@ -1163,6 +1295,52 @@ function wireSpend() {
 
   const rt = $("rolltog");
   if (rt) rt.onclick = () => saveRollover(!ROLLOVER);
+
+  // ---- the budget builder ----
+  const th = $("th");
+  if (th) {
+    th.addEventListener("keydown", e => { if (e.key === "Enter") th.blur(); });
+    // Deferred: a tap on Add while this field has focus fires blur first, and a
+    // repaint inside blur would replace the button before its click arrives.
+    th.onblur = () => setTimeout(() => saveTakeHome(th.value), 0);
+  }
+  const tp = $("thper");
+  if (tp) tp.onchange = () => savePayPer(tp.value);
+  for (const r of document.querySelectorAll("[data-bill]")) {
+    r.onclick = () => {
+      BILL_OPEN = BILL_OPEN === r.dataset.bill ? null : r.dataset.bill;
+      BILL_DRAFT.more = "";
+      paint();
+    };
+  }
+  for (const b of document.querySelectorAll("[data-billamt]")) {
+    b.onclick = e => {
+      e.stopPropagation();
+      const [id, i] = b.dataset.billamt.split("|");
+      removeBillAmount(id, parseInt(i, 10));
+    };
+  }
+  for (const b of document.querySelectorAll("[data-billdel]")) {
+    b.onclick = () => removeBill(b.dataset.billdel);
+  }
+  const ba = $("ba"), baadd = $("baadd");
+  if (ba) {
+    ba.oninput = () => { BILL_DRAFT.more = ba.value; };
+    ba.addEventListener("keydown", e => { if (e.key === "Enter") addBillAmount("", ba.value, BILL_OPEN); });
+  }
+  if (baadd) baadd.onclick = () => addBillAmount("", ba ? ba.value : "", BILL_OPEN);
+  const bn = $("billname"), bam = $("billamt"), badd = $("billadd");
+  if (bn) {
+    bn.oninput = () => { BILL_DRAFT.name = bn.value; };
+    bn.addEventListener("keydown", e => { if (e.key === "Enter" && bam) bam.focus(); });
+  }
+  if (bam) {
+    bam.oninput = () => { BILL_DRAFT.amt = bam.value; };
+    bam.addEventListener("keydown", e => {
+      if (e.key === "Enter") addBillAmount(bn ? bn.value : "", bam.value);
+    });
+  }
+  if (badd) badd.onclick = () => addBillAmount(bn ? bn.value : "", bam ? bam.value : "");
 }
 
 function goWeek(off) {
@@ -1278,8 +1456,7 @@ function addCategory(raw) {
   if (!name) { hint("Name the category first."); return; }
   const existing = CATS.find(c => (c.name || "").toLowerCase() === name.toLowerCase());
   if (!existing) {
-    const id = (self.crypto && crypto.randomUUID) ? crypto.randomUUID()
-      : "c" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    const id = newId();
     const cat = { id: id, name: name, group: "Other", custom: true };
     CATS.push(cat);
     setDoc(doc(db, "categories", id), cat)
@@ -1300,6 +1477,73 @@ function saveBudget(raw) {
          { weekly_budget: v, week_start: WEEK_START }, { merge: true })
     .catch(e => toast("Couldn't save the budget: " + (e.message || e)));
   toast("Weekly budget " + money(v));
+}
+
+// Every change to the builder re-derives the weekly budget and writes both in
+// one merge, so the stored weekly_budget is always what the inputs say it is.
+function saveBuilder(msg) {
+  const patch = {
+    take_home: TAKE_HOME,
+    take_home_per: TAKE_PER,
+    bills: BILLS.map(b => ({ id: b.id, name: b.name, amounts: b.amounts.slice() })),
+  };
+  if (builderOn()) { BUDGET = weeklyLeft(); patch.weekly_budget = BUDGET; }
+  paint();
+  setDoc(doc(db, "meta", "spend_settings"), patch, { merge: true })
+    .catch(e => toast("Couldn't save that: " + (e.message || e)));
+  if (msg) toast(msg + (builderOn() ? " · " + money2(BUDGET) + "/wk" : ""));
+}
+
+function saveTakeHome(raw) {
+  const v = parseMoney(raw);
+  const n = v > 0 ? v : 0;                 // blank or zero hands the budget back
+  if (n === TAKE_HOME) return;
+  TAKE_HOME = n;
+  saveBuilder(n > 0 ? "Take-home " + money2(n) + " " + PAY_PER[TAKE_PER][0].toLowerCase()
+                    : "Weekly budget is set by hand again");
+}
+
+function savePayPer(k) {
+  if (!PAY_PER[k] || k === TAKE_PER) return;
+  TAKE_PER = k;
+  saveBuilder(TAKE_HOME > 0 ? "Paid " + PAY_PER[k][0].toLowerCase() : "");
+}
+
+/// One more month's amount for a bill. Same company (by name, any case) folds
+/// into the same bill and the bill is budgeted at the average of every amount;
+/// a new company starts a bill. `id` targets an open bill directly.
+function addBillAmount(name, raw, id) {
+  const amount = parseMoney(raw);
+  if (!(amount >= 0)) { toast("Enter the amount first."); return; }
+  let b = id ? BILLS.find(x => x.id === id) : null;
+  if (!b) {
+    const nm = String(name || "").trim();
+    if (!nm) { toast("Name the company first."); const f = $("billname"); if (f) f.focus(); return; }
+    b = BILLS.find(x => billKey(x.name) === billKey(nm));
+    if (!b) { b = { id: newId(), name: nm, amounts: [] }; BILLS.push(b); }
+  }
+  b.amounts.push(amount);
+  BILL_DRAFT = { name: "", amt: "", more: "" };
+  if (b.amounts.length > 1) BILL_OPEN = b.id;   // show the amounts it is averaging
+  saveBuilder(b.name + " " + money2(billAvg(b))
+    + (b.amounts.length > 1 ? ", average of " + b.amounts.length : ""));
+}
+
+function removeBillAmount(id, i) {
+  const b = BILLS.find(x => x.id === id);
+  if (!b || !(i >= 0 && i < b.amounts.length)) return;
+  const [gone] = b.amounts.splice(i, 1);
+  if (!b.amounts.length) { removeBill(id); return; }
+  saveBuilder(b.name + " " + money2(billAvg(b)) + " without the " + money2(gone));
+}
+
+function removeBill(id) {
+  const b = BILLS.find(x => x.id === id);
+  if (!b) return;
+  BILLS = BILLS.filter(x => x.id !== id);
+  if (BILL_OPEN === id) BILL_OPEN = null;
+  saveBuilder();
+  toast("Removed " + b.name, "Undo", () => { BILLS.push(b); saveBuilder(b.name + " is back"); });
 }
 
 function saveRollover(on) {
@@ -1404,6 +1648,16 @@ $("diag").onclick = async e => {
 // Pure function, no data or credentials of its own. Pass a tab key to pick one.
 window.roostRender = (s, accounts, tab) => renderTab(tab || TAB, s, accounts || []);
 window.roostTabs = TABS.map(t => t.key);
+// Same idea for the budget builder: feed it inputs, get the numbers and the
+// markup back, no sign-in and no write.
+window.roostBudgetTest = (takeHome, per, bills, open) => {
+  BILL_OPEN = open || null;
+  TAKE_HOME = +takeHome || 0; TAKE_PER = PAY_PER[per] ? per : "month";
+  BILLS = (bills || []).map((b, i) => ({ id: b.id || "t" + i, name: b.name, amounts: b.amounts.slice() }));
+  if (builderOn()) BUDGET = weeklyLeft();
+  return { weekly: weeklyLeft(), monthlyIncome: monthlyIncome(), monthlyBills: monthlyBills(),
+           html: viewBudget() };
+};
 
 function monthName(ym) {
   if (!ym) return "LAST MONTH";

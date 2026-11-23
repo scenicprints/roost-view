@@ -83,6 +83,35 @@ Writes are optimistic and Firestore runs with a persistent local cache, so a
 purchase logged in a store with no signal is queued and sent on reconnect
 instead of being lost.
 
+### Where the weekly budget comes from (build 14)
+
+The budget used to be a number typed into a box. Now it is **worked out**: take-home
+pay minus the monthly bills, spread over 52 weeks, and written to the same
+`weekly_budget` everything above reads. Type a take-home amount and pick how often it
+lands (monthly, twice a month, every two weeks, weekly); the box for a hand-typed
+budget goes away while take-home is set and comes back when it is cleared.
+
+Bills are entered as **company + amount**. Adding the same company again with another
+month's amount folds into the same bill, and the bill is budgeted at the **average** of
+every amount entered, because an electric bill is not the same number twice. Tap a bill
+to see each amount, drop one, add another, or remove the bill (with an Undo). Names
+match case-insensitively, and the company field offers the names already entered.
+
+Stored in `meta/spend_settings` beside the budget it produces:
+
+| key | meaning |
+|---|---|
+| `take_home` | the amount per paycheck, `0` or missing = budget is set by hand |
+| `take_home_per` | `month`, `half` (twice a month), `2wk`, `wk` |
+| `bills` | `[{ id, name, amounts: [..] }]`, each budgeted at the mean of `amounts` |
+
+Weekly = max(0, (monthly take-home − Σ mean(bill)) × 12 ÷ 52). When the bills come to
+more than the take-home the budget reads $0 and the screen says by how much, rather
+than carrying a negative number into the week. On load the budget is re-derived from
+these inputs, never trusted from the stored copy, so the number on screen cannot
+drift from what is under it. `window.roostBudgetTest(takeHome, per, bills, openId)`
+renders the section without signing in.
+
 ## Installing (why it opened in a browser)
 
 `display: standalone`, the icons and a fetch-handling service worker have been
