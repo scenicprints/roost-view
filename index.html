@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#f0efec" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#141414" media="(prefers-color-scheme: dark)">
 <meta http-equiv="Cache-Control" content="no-cache, must-revalidate">
-<meta name="build" content="12">
+<meta name="build" content="16">
 <!-- Home-screen install: opens standalone (no browser bars), own icon. -->
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -440,6 +440,10 @@ if (!TABS.some(t => t.key === TAB)) TAB = "spend";
 let SNAP = null, ACCOUNTS = [];
 let SPEND = [], CATS = [], BUDGET = 0, WEEK_START = 0;
 let ROLLOVER = true, ROLL_CAP = 4;   // carry both ways; credit floored at N weeks (0 = no cap)
+// The budget as it was, week by week, so changing it never rewrites the past.
+// Newest last; `from` is always a week start. CARRY_FROM is the week the carry
+// chain starts at - everything before it is settled and left alone.
+let BUDGET_HISTORY = [], CARRY_FROM = "";
 
 function paintTabs() {
   $("tabs").innerHTML = TABS.map(t => {
@@ -492,8 +496,11 @@ async function load() {
     WEEK_START = Number.isInteger(st.week_start) ? st.week_start : 0;   // 0 = Sunday
     ROLLOVER = st.rollover !== false;                                   // default on
     ROLL_CAP = Number.isFinite(+st.rollover_cap_weeks) ? +st.rollover_cap_weeks : 4;
+    BUDGET_HISTORY = cleanHistory(st.budget_history);
+    CARRY_FROM = typeof st.carry_from === "string" ? st.carry_from : "";
     SPEND = logSnap.docs.map(d => ({ ...d.data(), _id: d.id }));
     CATS = catSnap.docs.map(d => d.data()).filter(c => c && c.name);
+    reconcileBudgetHistory();   // needs WEEK_START, so it runs after settings land
     paintTabs();
     paint();
     $("stamp").textContent = SNAP?.generated
@@ -796,6 +803,70 @@ function weekBounds(off) {
 
 const inWeek = (wsI, weI) => SPEND.filter(e => between(e.date, wsI, weI));
 
+/// ---- the budget, week by week ---------------------------------------------
+/// The budget is NOT one number. Changing it used to re-score every week that
+/// had already been settled: drop it by $120 and seventeen finished weeks were
+/// retried against the new figure, each shortfall compounding into the next, so
+/// a single edit could mint two thousand dollars of debt that never happened -
+/// and once the carry passed the budget the screen said "no weekly budget set".
+/// So the change is dated. Every week is settled against the budget that was in
+/// force THAT week, and an edit only ever moves the week he is standing in and
+/// the ones after it.
+const THE_BEGINNING = "0000-01-01";   // "as far back as the log goes"
+
+function cleanHistory(raw) {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map(h => ({ from: String(h && h.from || ""), amount: +(h && h.amount) || 0 }))
+    .filter(h => /^\d{4}-\d{2}-\d{2}$/.test(h.from) && h.amount >= 0)
+    .sort((a, b) => (a.from < b.from ? -1 : a.from > b.from ? 1 : 0));
+}
+
+/// The weekly budget in force for the week starting `wsI`. With no history at
+/// all this is simply the current figure, which is the old behaviour and is right
+/// until the first time it changes. Once there IS a history, a week earlier than
+/// its first entry had NO budget - `historyWith` always writes down a figure that
+/// already existed, so the only way to be before the record is to be before he
+/// ever set one. Falling back to today's figure there would re-score those weeks
+/// against a budget they never had, which is the whole bug in miniature.
+function budgetFor(wsI) {
+  if (!BUDGET_HISTORY.length) return BUDGET;
+  let v = 0;
+  for (const h of BUDGET_HISTORY) {
+    if (h.from <= wsI) v = h.amount; else break;
+  }
+  return v;
+}
+
+/// History with `amount` taking effect from the start of the current week, and
+/// whatever the budget is now pinned to every week before it. Called when the
+/// budget actually changes; a second change inside the same week overwrites that
+/// week's entry instead of stacking another one on top.
+function historyWith(amount) {
+  const wsI = isoDate(weekStartOf(new Date()));
+  const out = BUDGET_HISTORY.filter(h => h.from !== wsI);
+  // The first ever change is the one that needs the old figure written down, or
+  // every finished week would silently inherit the new one.
+  if (!out.length && BUDGET > 0) out.push({ from: THE_BEGINNING, amount: BUDGET });
+  out.push({ from: wsI, amount: amount });
+  out.sort((a, b) => (a.from < b.from ? -1 : 1));
+  // Collapse runs of the same figure: this array is a record of changes.
+  return out.filter((h, i) => i === 0 || h.amount !== out[i - 1].amount);
+}
+
+/// The desktop's "use as the phone's weekly budget" button writes `weekly_budget`
+/// and nothing else, and an older build of this page never wrote history at all.
+/// Either way the stored figure can be ahead of the record, so notice it here and
+/// write the change down - dated to this week, which is the earliest week it can
+/// honestly be blamed on - rather than let it rewrite settled weeks.
+function reconcileBudgetHistory() {
+  if (!(BUDGET > 0)) return;
+  const wsI = isoDate(weekStartOf(new Date()));
+  if (Math.abs(budgetFor(wsI) - BUDGET) < 0.005) return;
+  BUDGET_HISTORY = historyWith(BUDGET);
+  saveSettings({ budget_history: BUDGET_HISTORY });
+}
+
 /// Carry between weeks, SIGNED. Positive = owed, negative = banked.
 ///
 /// Overspend rolls forward as a debt that shrinks the next budget and keeps
@@ -804,24 +875,32 @@ const inWeek = (wsI, weI) => SPEND.filter(e => between(e.date, wsI, weI));
 /// the budget instead of putting it on a card. ROLLOVER off restores the old
 /// debt-only behaviour.
 ///
+/// Each week is scored against ITS OWN budget (`budgetFor`), so an edit today
+/// cannot reach back and re-settle a week that is already done.
+///
 /// A week with NOTHING logged moves the carry neither way. Forgetting to log is
 /// not the same as spending nothing: without this guard a gap in the log would
 /// mint a full week of phantom credit, and in the old code it silently forgave a
-/// full week of real debt.
+/// full week of real debt. A week with no budget on record moves it neither way
+/// either - there was nothing to be over or under.
 ///
 /// Banked credit is floored at ROLL_CAP weeks of budget so a long quiet stretch
-/// cannot become a blank cheque. Debt has no cap and is never forgiven.
+/// cannot become a blank cheque. Debt has no cap and is never forgiven - but
+/// CARRY_FROM draws a line under it, so a carry built out of bad numbers can be
+/// cleared once instead of being carried for ever.
 function carryInto(wsI) {
-  if (!(BUDGET > 0) || !SPEND.length) return 0;
-  const earliest = SPEND.reduce((m, e) => (e.date < m ? e.date : m), SPEND[0].date);
-  const floor = ROLL_CAP > 0 ? -BUDGET * ROLL_CAP : -Infinity;
+  if (!SPEND.length) return 0;
+  let earliest = SPEND.reduce((m, e) => (e.date < m ? e.date : m), SPEND[0].date);
+  if (CARRY_FROM && CARRY_FROM > earliest) earliest = CARRY_FROM;
   let d = weekStartOf(new Date(earliest + "T00:00:00"));
   let carry = 0;
   for (let guard = 0; isoDate(d) < wsI && guard < 400; guard++) {
     const a = isoDate(d), b = isoDate(addDays(d, 6));
+    const bud = budgetFor(a);
     const rows = inWeek(a, b);
-    if (rows.length) {
-      carry = sumOf(rows) - (BUDGET - carry);
+    if (rows.length && bud > 0) {
+      const floor = ROLL_CAP > 0 ? -bud * ROLL_CAP : -Infinity;
+      carry = sumOf(rows) - (bud - carry);
       carry = ROLLOVER ? Math.max(carry, floor) : Math.max(carry, 0);
     }
     d = addDays(d, 7);
@@ -831,8 +910,9 @@ function carryInto(wsI) {
 
 /// What next week opens at if this week ends exactly where it stands now.
 function nextBudgetAfter(left) {
-  const floor = ROLL_CAP > 0 ? -BUDGET * ROLL_CAP : -Infinity;
-  return BUDGET - (ROLLOVER ? Math.max(-left, floor) : Math.max(-left, 0));
+  const base = budgetFor(isoDate(addDays(weekStartOf(new Date()), 7)));
+  const floor = ROLL_CAP > 0 ? -base * ROLL_CAP : -Infinity;
+  return base - (ROLLOVER ? Math.max(-left, floor) : Math.max(-left, 0));
 }
 
 const allCategories = () => {
@@ -845,7 +925,7 @@ const allCategories = () => {
 /// that is better or worse than the same point last week. Same point, not the
 /// whole week, because "you have spent less than a full week" on a Tuesday is
 /// flattery, not feedback.
-function verdictFor(spent, budget, elapsed, thisWeek, tail) {
+function verdictFor(spent, budget, elapsed, thisWeek, tail, hasBudget) {
   const prev = weekBounds(WEEK_OFF - 1);
   const cutoff = isoDate(addDays(prev.ws, Math.max(0, elapsed - 1)));
   const prevRows = inWeek(prev.wsI, prev.weI);
@@ -853,8 +933,12 @@ function verdictFor(spent, budget, elapsed, thisWeek, tail) {
   const diff = spent - prevSame;
 
   let lead, tone = "";
-  if (budget <= 0) {
+  if (!hasBudget) {
     lead = spent > 0 ? "No budget set." : "Nothing logged.";
+  } else if (budget <= 0) {
+    // He HAS a budget. Last week's overspend is what ate it.
+    lead = "Nothing left this week.";
+    tone = "bad";
   } else if (spent > budget) {
     lead = "Over budget.";
     tone = "bad";
@@ -887,13 +971,14 @@ function verdictFor(spent, budget, elapsed, thisWeek, tail) {
 
 /// Completed weeks, newest first, that came in at or under their own budget.
 function underStreak() {
-  if (!(BUDGET > 0)) return 0;
   let n = 0;
   for (let i = 1; i <= 12; i++) {
     const b = weekBounds(WEEK_OFF - i);
+    const base = budgetFor(b.wsI);
+    if (!(base > 0)) break;
     const rows = inWeek(b.wsI, b.weI);
     if (!rows.length) break;
-    if (sumOf(rows) > BUDGET - carryInto(b.wsI)) break;
+    if (sumOf(rows) > base - carryInto(b.wsI)) break;
     n++;
   }
   return n;
@@ -906,10 +991,12 @@ function history() {
   const cols = [];
   for (let i = 7; i >= 0; i--) {
     const b = weekBounds(WEEK_OFF - i);
+    const base = budgetFor(b.wsI);
     cols.push({
       off: WEEK_OFF - i,
       tot: sumOf(inWeek(b.wsI, b.weI)),
-      bud: BUDGET > 0 ? BUDGET - carryInto(b.wsI) : 0,
+      bud: base > 0 ? base - carryInto(b.wsI) : 0,
+      hasBud: base > 0,
       label: (b.ws.getMonth() + 1) + "/" + b.ws.getDate(),
     });
   }
@@ -922,7 +1009,10 @@ function history() {
   if (line > 0) h += `<div class="budgetline" style="bottom:${18 + line}px"></div>`;
   for (const c of cols) {
     const px = Math.max(c.tot > 0 ? 2 : 0, Math.round(c.tot / max * H));
-    const cls = c.off === 0 ? "now" : (c.bud > 0 && c.tot > c.bud ? "over" : "");
+    // A week the carry had already eaten has a budget of zero or less, so
+    // anything at all in it is over - that is the point of the carry.
+    const cls = c.off === 0 ? "now"
+      : (c.hasBud && c.tot > 0 && c.tot > c.bud ? "over" : "");
     h += `<button class="histcol" data-week="${c.off}" aria-label="${esc(c.label)}">
         <i class="${cls}" style="height:${px}px"></i>
         <span>${esc(c.label)}</span></button>`;
@@ -936,7 +1026,13 @@ function viewSpend() {
   const week = inWeek(wsI, weI);
   const spent = sumOf(week);
   const carry = carryInto(wsI);
-  const budget = BUDGET > 0 ? BUDGET - carry : 0;
+  const base = budgetFor(wsI);          // the budget this week was set at
+  const hasBudget = base > 0;
+  // This can go NEGATIVE when the carry is bigger than the budget, and it has to
+  // be allowed to: clamping it to zero is what made the screen say "no weekly
+  // budget set" to a man who had one and was deep in the hole against it.
+  const budget = hasBudget ? base - carry : 0;
+  const room = Math.max(0, budget);     // what there actually is to spend
   const left = budget - spent;
   const thisWeek = WEEK_OFF === 0;
   const elapsed = thisWeek
@@ -950,14 +1046,14 @@ function viewSpend() {
       <span class="lbl">${esc(spanLabel(ws, we))}</span>
       <button id="wnext" aria-label="Next week" ${thisWeek ? "disabled" : ""}>&#8250;</button>
     </div>
-    <div class="big mono ${budget > 0 && left < 0 ? "neg" : ""}">${money2(spent)}</div>`;
+    <div class="big mono ${hasBudget && left < 0 ? "neg" : ""}">${money2(spent)}</div>`;
 
-  if (budget > 0) {
-    const pct = Math.min(100, Math.round(spent / budget * 100));
+  if (hasBudget) {
+    const pct = budget > 0 ? Math.min(100, Math.round(spent / budget * 100)) : 100;
     const state = left < 0 ? "bad"
       : (thisWeek && spent > budget * (elapsed / 7)) ? "warn" : "good";
     const paint = { good: "var(--good)", warn: "var(--warn)", bad: "var(--accent)" }[state];
-    h += `<div class="muted" style="margin-top:2px">of ${money2(budget)} &middot;
+    h += `<div class="muted" style="margin-top:2px">of ${money2(room)} &middot;
         <b class="${left < 0 ? "neg" : "pos"}">${left < 0 ? money2(-left) + " over"
                                                           : money2(left) + " left"}</b></div>
       <div class="bar tall"><i style="width:${pct}%;background:${paint}"></i>${
@@ -967,7 +1063,7 @@ function viewSpend() {
   }
 
   let tail = "";
-  if (budget > 0 && thisWeek && left > 0 && daysLeft >= 0) {
+  if (hasBudget && thisWeek && left > 0 && daysLeft >= 0) {
     tail = `${money2(left / (daysLeft + 1))} a day for the ${daysLeft + 1}
       day${daysLeft === 0 ? "" : "s"} left.`;
     // Last day only. Before that the week is not settled, and promising him a
@@ -975,21 +1071,32 @@ function viewSpend() {
     if (ROLLOVER && daysLeft === 0) {
       tail += ` <b class="pos">Next week starts at ${money2(nextBudgetAfter(left))}.</b>`;
     }
-  } else if (budget > 0 && left < 0 && thisWeek) {
-    // Over is settled the moment it happens, so this one shows on any day.
-    tail = `<b class="neg">Next week starts at ${money2(nextBudgetAfter(left))}.</b>`;
+  } else if (hasBudget && left < 0 && thisWeek) {
+    // Over is settled the moment it happens, so this one shows on any day. When the
+    // overspend is bigger than a whole week, next week opens at nothing and the rest
+    // keeps going: "starts at -$750" is arithmetic, not an answer.
+    const next = nextBudgetAfter(left);
+    tail = `<b class="neg">Next week starts at ${money2(Math.max(0, next))}${
+      next < -0.005 ? `, with ${money2(-next)} still carried` : ""}.</b>`;
   }
-  h += verdictFor(spent, budget, elapsed, thisWeek, tail);
+  h += verdictFor(spent, budget, elapsed, thisWeek, tail, hasBudget);
 
   if (carry > 0) {
+    // When the carry is bigger than the budget there is no week left to spend -
+    // say so, say how much of it survives into next week, and offer the way out.
+    const over = carry - base;
     h += `<div class="note bad" style="margin-top:10px">
         <div class="tiny">Carried over: ${money2(carry)} of overspend, so this week
-          is ${money2(budget)} instead of ${money2(BUDGET)}.</div></div>`;
+          is ${money2(room)} instead of ${money2(base)}.${
+          over > 0.005 ? ` That is more than a whole week, so ${money2(over)} of it
+            carries on past this one.` : ""}</div>${
+        thisWeek ? `<button class="datepill" id="clearcarry" style="margin-top:8px"
+          >Start fresh from this week</button>` : ""}</div>`;
   } else if (carry < 0) {
-    const atCap = ROLL_CAP > 0 && -carry >= BUDGET * ROLL_CAP - 0.005;
+    const atCap = ROLL_CAP > 0 && -carry >= base * ROLL_CAP - 0.005;
     h += `<div class="note good" style="margin-top:10px">
         <div class="tiny">Banked: ${money2(-carry)} from weeks you came in under, so
-          this week is ${money2(budget)} instead of ${money2(BUDGET)}.${
+          this week is ${money2(room)} instead of ${money2(base)}.${
           atCap ? ` That is the ${ROLL_CAP}-week cap.` : ""}</div></div>`;
   }
   // ---- the thing he actually opens the app to do ----
@@ -1119,7 +1226,9 @@ function viewSpend() {
            is added on${ROLL_CAP > 0 ? `, up to ${ROLL_CAP} weeks of banked credit` : ""},
            so a lean week is how you save up for something.`
         : `Go over and the difference comes out of the week after. Coming in under banks
-           nothing.`} A week with nothing logged moves it neither way.</div>`;
+           nothing.`} A week with nothing logged moves it neither way. A new budget
+      starts from this week: the weeks behind it keep the figure they were scored
+      against, so changing it never rewrites what you already did.</div>`;
   return h;
 }
 
@@ -1163,6 +1272,14 @@ function wireSpend() {
 
   const rt = $("rolltog");
   if (rt) rt.onclick = () => saveRollover(!ROLLOVER);
+
+  // Wiping out a running total is not a mis-tap kind of action.
+  const cc = $("clearcarry");
+  if (cc) cc.onclick = () => {
+    const amt = money2(carryInto(weekBounds(0).wsI));
+    if (confirm("Forget the " + amt + " carried over and start this week at the "
+                + "full budget?")) clearCarry();
+  };
 }
 
 function goWeek(off) {
@@ -1291,23 +1408,41 @@ function addCategory(raw) {
   else paint();                                               // otherwise just keep the chip
 }
 
+function saveSettings(patch) {
+  return setDoc(doc(db, "meta", "spend_settings"), patch, { merge: true })
+    .catch(e => toast("Couldn't save that: " + (e.message || e)));
+}
+
+/// A new budget takes effect from THIS week. The weeks behind it keep the figure
+/// they were actually scored against, so this never moves what he already spent
+/// or the carry it produced.
 function saveBudget(raw) {
   const v = Math.round(parseFloat(String(raw).replace(/[^0-9.]/g, "")) * 100) / 100;
   if (!(v >= 0)) return;
+  if (Math.abs(v - BUDGET) < 0.005) { toast("Weekly budget " + money(v)); return; }
+  const hist = historyWith(v);
   BUDGET = v;
+  BUDGET_HISTORY = hist;
   paint();
-  setDoc(doc(db, "meta", "spend_settings"),
-         { weekly_budget: v, week_start: WEEK_START }, { merge: true })
-    .catch(e => toast("Couldn't save the budget: " + (e.message || e)));
-  toast("Weekly budget " + money(v));
+  saveSettings({ weekly_budget: v, week_start: WEEK_START, budget_history: hist });
+  toast("Weekly budget " + money(v) + " from this week on");
+}
+
+/// Draw a line under the carry: weeks before this one are done with, whatever
+/// they added up to. The way out when the running total was built out of numbers
+/// that turned out to be wrong.
+function clearCarry() {
+  const wsI = isoDate(weekStartOf(new Date()));
+  CARRY_FROM = wsI;
+  paint();
+  saveSettings({ carry_from: wsI });
+  toast("Started fresh from this week");
 }
 
 function saveRollover(on) {
   ROLLOVER = !!on;
   paint();
-  setDoc(doc(db, "meta", "spend_settings"),
-         { rollover: ROLLOVER, rollover_cap_weeks: ROLL_CAP }, { merge: true })
-    .catch(e => toast("Couldn't save that: " + (e.message || e)));
+  saveSettings({ rollover: ROLLOVER, rollover_cap_weeks: ROLL_CAP });
   toast(ROLLOVER ? "Underspend now rolls over too" : "Only overspend rolls over");
 }
 

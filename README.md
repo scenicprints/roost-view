@@ -59,15 +59,48 @@ Settings live beside the budget in `meta/spend_settings`:
 |---|---|---|
 | `rollover` | `true` | both directions. `false` restores the old debt-only behaviour. |
 | `rollover_cap_weeks` | `4` | banked credit is floored at N weeks of budget. `0` = uncapped. |
+| `budget_history` | `[]` | `[{from, amount}]`, oldest first: when the weekly budget changed and to what. `from` is a week start; `0000-01-01` means "as far back as the log goes". |
+| `carry_from` | `""` | the week the carry chain starts at. Weeks before it are settled and never re-added. |
 
-Two guards, both deliberate:
+### The budget is DATED (build 16)
+
+**The budget is not one number.** `carryInto` replays every week from the log back
+to `carry_from`, and it used to settle each of them against the budget *as it is
+right now*. So editing the budget rewrote the past: drop it by $150 and eleven
+finished weeks were re-scored against the new figure, each shortfall compounding
+into the next — a **$550 banked credit became $1,100 of debt**, and once the carry
+passed the budget `budget = BUDGET - carry` went negative and the screen said
+**"no weekly budget set"** to a man who had one.
+
+So `budgetFor(weekStart)` reads `budget_history`, every week is scored against the
+figure that was in force *that* week, and `saveBudget` records a change effective
+from the current week start (the first change writes the old figure down against
+`0000-01-01`, or the finished weeks would silently inherit the new one). An edit
+now only ever moves the week he is standing in and the ones after it.
+
+The desktop's `budget.send_to_phone` writes the same history entry. An older build
+of either wrote only `weekly_budget`, so `reconcileBudgetHistory()` on load notices
+a stored figure that is ahead of the record and dates it to the current week — the
+earliest week it can honestly be blamed on — rather than letting it reach back.
+
+Three guards, all deliberate:
 
 - **A week with nothing logged moves the carry neither way.** Forgetting to log is
   not the same as spending nothing. Without this a gap in the log would mint a
   full week of phantom credit, and the old debt-only code silently *forgave* a
-  full week of real debt the same way.
+  full week of real debt the same way. A week with no budget on record moves it
+  neither way either — there was nothing to be over or under.
 - **Credit is capped, debt is not.** A long quiet stretch cannot turn the budget
   into a blank cheque, and overspend is never forgiven.
+- **`carry_from` is the one way out.** A carry built out of numbers that turned
+  out to be wrong can be written off once, from the carry note's "Start fresh from
+  this week" (confirmed first). There is no cap on debt and no other amnesty.
+
+**A budget eaten by the carry is not the absence of a budget.** `viewSpend` keeps
+`base` (this week's figure), `hasBudget` (`base > 0`) and `budget` (`base - carry`,
+allowed to go negative) apart, and shows the week at `$0.00` with what is still
+owed. Only `!hasBudget` prints "no weekly budget set". The watch's `Standing` has
+the same `hasBudget`/`room` split for the same reason.
 
 The header note reads "Carried over: $X of overspend" or "Banked: $X from weeks
 you came in under", and says what this week is instead of the base budget. The

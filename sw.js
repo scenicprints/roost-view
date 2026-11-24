@@ -11,7 +11,7 @@
  * nothing. The cache is only a fallback for when the phone is actually offline.
  * Firestore/Firebase traffic is cross-origin and is never touched here.
  */
-const VERSION = "roost-v9";
+const VERSION = "roost-v12";
 const SHELL = [
   "./",
   "./index.html",
